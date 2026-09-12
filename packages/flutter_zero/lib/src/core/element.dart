@@ -162,8 +162,10 @@ class StatefulElement extends ComponentElement {
 
   @override
   void mount(Element? parent) {
+    this.parent = parent;
+    _inheritedElements = parent?._inheritedElements;
     _state.initState();
-    super.mount(parent);
+    performBuild();
   }
 
   @override

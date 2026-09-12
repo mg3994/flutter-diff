@@ -323,6 +323,43 @@ void main() {
       final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
       expect(textView.props['text'], equals('Completed Future'));
     });
+
+    test('Provider and Consumer dependency injection', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Provider<String>(
+          value: 'Injected Test Value',
+          child: Consumer<String>(
+            builder: (context, val, child) => Text(val),
+          ),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('Injected Test Value'));
+    });
+
+    test('AlertDialog overlay layout', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const AlertDialog(
+          title: Text('Test Dialog Title'),
+          content: Text('Test Dialog Content'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
+      expect(textViews[0].props['text'], equals('Test Dialog Title'));
+      expect(textViews[1].props['text'], equals('Test Dialog Content'));
+    });
   });
 }
 

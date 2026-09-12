@@ -1198,6 +1198,9 @@ class ListViewElement extends NativeRenderElement {
       final el = w.createElement();
       el.mount(this);
       if (el.renderNode != null) {
+        if (w is Flexible) {
+          el.renderNode!.props['flex'] = w.flex;
+        }
         multiNode.addChild(el.renderNode!);
       }
       return el;

@@ -8,13 +8,13 @@ class CounterApp extends StatefulWidget {
 }
 
 class _CounterAppState extends State<CounterApp> {
-  int _counter = 0;
+  final ValueNotifier<int> _notifierCounter = ValueNotifier<int>(0);
   String _inputText = '';
 
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
+  @override
+  void dispose() {
+    _notifierCounter.dispose();
+    super.dispose();
   }
 
   @override
@@ -28,22 +28,29 @@ class _CounterAppState extends State<CounterApp> {
         child: Column(
           children: [
             Text(
-              'Flutter Zero Advanced Native Rendering Demo',
+              'Flutter Zero Complete Native Platform Framework',
               fontSize: theme.defaultFontSize + 4.0,
               color: theme.textColor,
             ),
             const SizedBox(height: 10.0),
-            Text(
-              'Button clicks counter: $_counter | Input: $_inputText',
-              fontSize: theme.defaultFontSize,
-              color: theme.primaryColor,
+            ValueListenableBuilder<int>(
+              valueListenable: _notifierCounter,
+              builder: (context, count, child) {
+                return Text(
+                  'ValueNotifier Counter: $count | Input: $_inputText',
+                  fontSize: theme.defaultFontSize,
+                  color: theme.primaryColor,
+                );
+              },
             ),
             const SizedBox(height: 15.0),
             Row(
               children: [
                 Button(
-                  onPressed: _incrementCounter,
-                  child: const Text('Increment Counter'),
+                  onPressed: () {
+                    _notifierCounter.value++;
+                  },
+                  child: const Text('Increment ValueNotifier'),
                 ),
                 const SizedBox(width: 10.0),
                 Expanded(
@@ -72,14 +79,24 @@ class _CounterAppState extends State<CounterApp> {
               ),
             ),
             const SizedBox(height: 15.0),
-            Expanded(
-              child: ListView(
-                itemExtent: 40.0,
-                children: List.generate(
-                  3,
-                  (i) => Text('Native ListView Item #${i + 1}', fontSize: 13.0),
+            const Text('Embedded Platform Native Views:', fontSize: 14.0),
+            const SizedBox(height: 5.0),
+            const Row(
+              children: [
+                Expanded(
+                  child: AndroidNativeView(
+                    viewType: 'com.example.native_map',
+                    creationParams: {'zoom': 12},
+                  ),
                 ),
-              ),
+                SizedBox(width: 10.0),
+                Expanded(
+                  child: UIKitNativeView(
+                    viewType: 'com.example.native_camera',
+                    creationParams: {'quality': 'high'},
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -105,7 +122,7 @@ void main() {
     backend: backend,
   );
 
-  print('=== Initializing Flutter Zero App with Theme & Gestures ===');
+  print('=== Initializing Flutter Zero App with ValueNotifier & Native Views ===');
   app.run();
 
   print('\n=== Native View Tree After Initial Mount ===');
@@ -114,10 +131,10 @@ void main() {
   final buttonViews = backend.views.values.where((v) => v.widgetType == 'Button').toList();
   if (buttonViews.isNotEmpty) {
     final buttonView = buttonViews.first;
-    print('\n>>> Simulating native click on Button #${buttonView.handle}...');
+    print('\n>>> Simulating native click on ValueNotifier Button #${buttonView.handle}...');
     backend.dispatchNativeEvent(buttonView.handle, 'click', {});
   }
 
-  print('\n=== Native View Tree After Reactive State Update ===');
+  print('\n=== Native View Tree After Reactive ValueNotifier Update ===');
   print(backend.printTree());
 }

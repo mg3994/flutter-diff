@@ -220,6 +220,67 @@ void main() {
       expect(textViews[1].offset, equals(const Offset(0.0, 30.0)));
       expect(textViews[2].offset, equals(const Offset(0.0, 60.0)));
     });
+
+    test('AnimationController and Tween evaluation', () {
+      final controller = AnimationController(
+        duration: const Duration(milliseconds: 100),
+        initialValue: 0.0,
+      );
+      const tween = Tween<double>(begin: 10.0, end: 50.0);
+
+      expect(tween.evaluate(controller), equals(10.0));
+
+      controller.value = 0.5;
+      expect(tween.evaluate(controller), equals(30.0));
+
+      controller.value = 1.0;
+      expect(tween.evaluate(controller), equals(50.0));
+    });
+
+    test('ValueNotifier and ValueListenableBuilder reactive updates', () {
+      final backend = VirtualNativeUIBackend();
+      final notifier = ValueNotifier<String>('Initial Value');
+
+      final app = FlutterZeroApp(
+        rootWidget: ValueListenableBuilder<String>(
+          valueListenable: notifier,
+          builder: (context, value, child) => Text(value),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      var textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('Initial Value'));
+
+      notifier.value = 'Updated Value';
+
+      textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('Updated Value'));
+    });
+
+    test('AndroidNativeView and UIKitNativeView platform view layout', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Column(
+          children: [
+            AndroidNativeView(viewType: 'android_map'),
+            UIKitNativeView(viewType: 'uikit_web'),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final androidView = backend.views.values.firstWhere((v) => v.widgetType == 'AndroidView');
+      final uikitView = backend.views.values.firstWhere((v) => v.widgetType == 'UIKitView');
+
+      expect(androidView.props['viewType'], equals('android_map'));
+      expect(uikitView.props['viewType'], equals('uikit_web'));
+    });
   });
 }
 

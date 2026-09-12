@@ -1269,6 +1269,62 @@ class ListViewElement extends NativeRenderElement {
   }
 }
 
+class AndroidNativeView extends NativeRenderWidget {
+  final String viewType;
+  final Map<String, dynamic> creationParams;
+
+  const AndroidNativeView({
+    super.key,
+    required this.viewType,
+    this.creationParams = const {},
+  });
+
+  @override
+  NativeRenderNode createRenderNode() {
+    return PlatformViewRenderNode(
+      widgetType: 'AndroidView',
+      props: {
+        'viewType': viewType,
+        'creationParams': creationParams,
+      },
+    );
+  }
+}
+
+class UIKitNativeView extends NativeRenderWidget {
+  final String viewType;
+  final Map<String, dynamic> creationParams;
+
+  const UIKitNativeView({
+    super.key,
+    required this.viewType,
+    this.creationParams = const {},
+  });
+
+  @override
+  NativeRenderNode createRenderNode() {
+    return PlatformViewRenderNode(
+      widgetType: 'UIKitView',
+      props: {
+        'viewType': viewType,
+        'creationParams': creationParams,
+      },
+    );
+  }
+}
+
+class PlatformViewRenderNode extends NativeRenderNode {
+  PlatformViewRenderNode({required super.widgetType, required super.props});
+
+  @override
+  void performLayout(BoxConstraints constraints) {
+    size = constraints.constrain(Size(
+      constraints.maxWidth.isFinite ? constraints.maxWidth : 300.0,
+      constraints.maxHeight.isFinite ? constraints.maxHeight : 200.0,
+    ));
+  }
+}
+
 class ColumnElement extends NativeRenderElement {
   List<Element> _childElements = [];
 

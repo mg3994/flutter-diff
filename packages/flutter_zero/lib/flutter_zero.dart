@@ -1,6 +1,7 @@
 library flutter_zero;
 
 export 'src/animation/animation.dart';
+export 'src/assets/native_assets.dart';
 export 'src/widgets/async.dart';
 export 'src/widgets/image.dart';
 export 'src/widgets/custom_paint.dart';
@@ -12,9 +13,11 @@ export 'src/widgets/form.dart';
 export 'src/navigation/dialog.dart';
 export 'src/navigation/navigator.dart';
 export 'src/state/change_notifier.dart';
+export 'src/state/restoration.dart';
 export 'src/state/provider.dart';
 export 'src/backend/ffi_backend.dart';
 export 'src/backend/native_ui_backend.dart';
+export 'src/backend/jni_backend.dart';
 export 'src/backend/virtual_backend.dart';
 export 'src/core/element.dart';
 export 'src/core/render_node.dart';

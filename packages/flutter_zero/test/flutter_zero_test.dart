@@ -506,6 +506,37 @@ void main() {
       expect(json['rootCount'], equals(1));
       expect((json['views'] as List).isNotEmpty, isTrue);
     });
+
+    test('JNINativeUIBackend view creation and serialization', () {
+      final jniBackend = JNINativeUIBackend();
+      expect(jniBackend.isJNIEnvironmentAvailable, isFalse);
+
+      final handle = jniBackend.createView('AndroidView', {'type': 'map'});
+      expect(handle > 0, isTrue);
+
+      final serialized = jniBackend.serializeJNIViewTree();
+      expect(serialized.contains('AndroidView'), isTrue);
+    });
+
+    test('NativeAssetBundle library resolution', () {
+      final bundle = NativeAssetBundle.instance;
+      final lib = bundle.loadNativeLibrary('process_lib');
+      expect(lib, isNotNull);
+    });
+
+    test('RestorationBucket and RestorableProperty write and read', () {
+      final bucket = RestorationBucket();
+      final restorableInt = RestorableInt(5);
+
+      restorableInt.value = 42;
+      restorableInt.save(bucket, 'int_key');
+
+      expect(bucket.read<int>('int_key'), equals(42));
+
+      final restoredInt = RestorableInt(0);
+      restoredInt.restore(bucket, 'int_key');
+      expect(restoredInt.value, equals(42));
+    });
   });
 }
 

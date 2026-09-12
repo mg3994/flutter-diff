@@ -1,0 +1,70 @@
+From 02e48259b9fd71148f78bb3f89196536eb105442 Mon Sep 17 00:00:00 2001
+From: Matej Knopp <matej.knopp@gmail.com>
+Date: Tue, 12 May 2026 22:23:19 +0200
+Subject: [PATCH] Tool: Use original storage URL for gradle wrapper and tools
+
+---
+ packages/flutter_tools/lib/src/cache.dart         | 9 ++++++++-
+ packages/flutter_tools/lib/src/flutter_cache.dart | 5 ++---
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/packages/flutter_tools/lib/src/cache.dart b/packages/flutter_tools/lib/src/cache.dart
+index 2f8eedea091..37b9e888c12 100644
+--- a/packages/flutter_tools/lib/src/cache.dart
++++ b/packages/flutter_tools/lib/src/cache.dart
+@@ -237,7 +237,12 @@ class Cache {
+       tempStorage: getDownloadDir(),
+       platform: _platform,
+       httpClient: HttpClient(),
+-      allowedBaseUrls: <String>[storageBaseUrl, realmlessStorageBaseUrl, cipdBaseUrl],
++      allowedBaseUrls: <String>[
++        storageBaseUrl,
++        realmlessStorageBaseUrl,
++        cipdBaseUrl,
++        originalStorageUrl,
++      ],
+       stdio: _stdio,
+     );
+   }
+@@ -554,6 +559,8 @@ class Cache {
+     return overrideUrl;
+   }
+ 
++  String get originalStorageUrl => 'https://storage.googleapis.com';
++
+   String get realmlessStorageBaseUrl {
+     return storageRealm.isEmpty ? storageBaseUrl : storageBaseUrl.replaceAll('/$storageRealm', '');
+   }
+diff --git a/packages/flutter_tools/lib/src/flutter_cache.dart b/packages/flutter_tools/lib/src/flutter_cache.dart
+index e03c34a6162..7e472511fda 100644
+--- a/packages/flutter_tools/lib/src/flutter_cache.dart
++++ b/packages/flutter_tools/lib/src/flutter_cache.dart
+@@ -31,7 +31,6 @@ class FlutterCache extends Cache {
+     required FlutterProjectFactory projectFactory,
+     super.stdio,
+   }) : super(logger: logger, platform: platform, artifacts: <ArtifactSet>[]) {
+-    registerArtifact(MaterialFonts(this));
+     registerArtifact(GradleWrapper(this));
+     registerArtifact(AndroidGenSnapshotArtifacts(this, platform: platform));
+     registerArtifact(AndroidInternalBuildArtifacts(this));
+@@ -544,7 +543,7 @@ class GradleWrapper extends CachedArtifact {
+ 
+   List<String> get _gradleScripts => <String>['gradlew', 'gradlew.bat'];
+ 
+-  Uri _toStorageUri(String path) => Uri.parse('${cache.storageBaseUrl}/$path');
++  Uri _toStorageUri(String path) => Uri.parse('${cache.originalStorageUrl}/$path');
+ 
+   @override
+   Future<void> updateInner(
+@@ -864,7 +863,7 @@ class IosUsbArtifacts extends CachedArtifact {
+ 
+   @visibleForTesting
+   Uri get archiveUri => Uri.parse(
+-    '${cache.realmlessStorageBaseUrl}/flutter_infra_release/'
++    '${cache.originalStorageUrl}/flutter_infra_release/'
+     'ios-usb-dependencies/arm64_x86_64${cache.useUnsignedMacBinaries ? '/unsigned' : ''}'
+     '/$name/$version/$name.zip',
+   );
+-- 
+2.51.2
+

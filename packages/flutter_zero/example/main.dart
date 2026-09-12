@@ -1,23 +1,13 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
-class SamplePainter extends CustomPainter {
-  @override
-  void paint(NativeCanvas canvas, Size size) {
-    canvas.drawRect(Offset.zero, size, '#E0E0E0');
-    canvas.drawCircle(Offset(size.width / 2, size.height / 2), 20.0, '#FF0000');
-    canvas.drawLine(Offset.zero, Offset(size.width, size.height), '#0066CC', 2.0);
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
+const methodChannel = MethodChannel('com.flutter_zero/device_info');
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
+    final locale = Localizations.localeOf(context);
     final theme = Theme.of(context);
 
     return Container(
@@ -27,16 +17,17 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              'Flutter Zero Screen (${media.orientation.name.toUpperCase()} mode)',
+              'Flutter Zero Locale: ${locale.languageCode}',
               fontSize: theme.defaultFontSize + 4.0,
               color: theme.textColor,
             ),
             const SizedBox(height: 15.0),
-            Text('Device Pixel Ratio: ${media.devicePixelRatio}'),
-            const SizedBox(height: 15.0),
-            CustomPaint(
-              painter: SamplePainter(),
-              size: const Size(200.0, 100.0),
+            Button(
+              onPressed: () async {
+                final String? version = await methodChannel.invokeMethod<String>('getOSVersion');
+                print('Native MethodChannel Response: $version');
+              },
+              child: const Text('Invoke Host Platform MethodChannel'),
             ),
           ],
         ),
@@ -48,22 +39,25 @@ class HomeScreen extends StatelessWidget {
 void main() {
   final backend = VirtualNativeUIBackend();
 
-  const mediaData = MediaQueryData(
-    size: Size(1024.0, 768.0),
-    devicePixelRatio: 2.0,
-  );
+  methodChannel.setMethodCallHandler((call) async {
+    if (call.method == 'getOSVersion') {
+      return 'Flutter Zero Platform v1.0.0 (Native FFI)';
+    }
+    return null;
+  });
 
   final app = FlutterZeroApp(
-    rootWidget: const MediaQuery(
-      data: mediaData,
+    rootWidget: const Localizations(
+      locale: Locale('en', 'US'),
       child: HomeScreen(),
     ),
     backend: backend,
   );
 
-  print('=== Initializing Flutter Zero App with MediaQuery & CustomPaint ===');
+  print('=== Initializing Flutter Zero App with Localizations & MethodChannel ===');
   app.run();
 
-  print('\n=== Native View Tree on Mount ===');
-  print(backend.printTree());
+  print('\n=== Native Tree Inspector Diagnostic JSON ===');
+  final inspector = NativeTreeInspector(backend);
+  print(inspector.toJson());
 }

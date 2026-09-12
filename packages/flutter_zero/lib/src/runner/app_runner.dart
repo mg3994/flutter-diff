@@ -49,7 +49,7 @@ class FlutterZeroApp {
 
     backend.updateLayout(node.nativeHandle!, node.offset, node.size);
 
-    if (parentHandle != null) {
+    if (isNew && parentHandle != null) {
       backend.appendChild(parentHandle, node.nativeHandle!);
     }
 

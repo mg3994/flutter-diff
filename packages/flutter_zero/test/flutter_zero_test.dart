@@ -459,7 +459,64 @@ void main() {
       expect(commands.isNotEmpty, isTrue);
       expect(commands.first['type'], equals('drawRect'));
     });
+
+    test('Localizations locale resolution in widget context', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Localizations(
+          locale: Locale('fr', 'FR'),
+          child: _LocaleConsumerWidget(),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('fr_FR'));
+    });
+
+    test('MethodChannel invocation and response handling', () async {
+      const channel = MethodChannel('test_channel');
+      channel.setMethodCallHandler((call) async {
+        if (call.method == 'ping') {
+          return 'pong';
+        }
+        return null;
+      });
+
+      final result = await channel.invokeMethod<String>('ping');
+      expect(result, equals('pong'));
+    });
+
+    test('NativeTreeInspector JSON serialization', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Container(child: Text('Inspect Me')),
+        backend: backend,
+      );
+
+      app.run();
+
+      final inspector = NativeTreeInspector(backend);
+      final json = inspector.toJson();
+
+      expect(json['rootCount'], equals(1));
+      expect((json['views'] as List).isNotEmpty, isTrue);
+    });
   });
+}
+
+class _LocaleConsumerWidget extends StatelessWidget {
+  const _LocaleConsumerWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+    return Text(locale.toString());
+  }
 }
 
 class _OrientationTextWidget extends StatelessWidget {

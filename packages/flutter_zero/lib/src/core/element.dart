@@ -48,6 +48,9 @@ abstract class Element implements BuildContext {
   void update(Widget newWidget);
 
   void unmount() {
+    if (renderNode?.nativeHandle != null) {
+      appOwner?.backend.removeView(renderNode!.nativeHandle!);
+    }
     parent = null;
     renderNode = null;
   }
@@ -177,8 +180,8 @@ class StatefulElement extends ComponentElement {
 
   @override
   void update(Widget newWidget) {
-    _widget = newWidget;
     final StatefulWidget oldWidget = widget;
+    _widget = newWidget;
     _state.updateWidget(newWidget as StatefulWidget);
     _state.didUpdateWidget(oldWidget);
     rebuild();

@@ -1,6 +1,8 @@
 library flutter_zero;
 
 export 'src/animation/animation.dart';
+export 'src/widgets/async.dart';
+export 'src/navigation/navigator.dart';
 export 'src/state/change_notifier.dart';
 export 'src/backend/ffi_backend.dart';
 export 'src/backend/native_ui_backend.dart';

@@ -1,21 +1,8 @@
+import 'dart:async';
 import 'package:flutter_zero/flutter_zero.dart';
 
-class CounterApp extends StatefulWidget {
-  const CounterApp({super.key});
-
-  @override
-  State<CounterApp> createState() => _CounterAppState();
-}
-
-class _CounterAppState extends State<CounterApp> {
-  final ValueNotifier<int> _notifierCounter = ValueNotifier<int>(0);
-  String _inputText = '';
-
-  @override
-  void dispose() {
-    _notifierCounter.dispose();
-    super.dispose();
-  }
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -28,75 +15,63 @@ class _CounterAppState extends State<CounterApp> {
         child: Column(
           children: [
             Text(
-              'Flutter Zero Complete Native Platform Framework',
+              'Flutter Zero Screen #1 (Navigator Home)',
               fontSize: theme.defaultFontSize + 4.0,
               color: theme.textColor,
             ),
-            const SizedBox(height: 10.0),
-            ValueListenableBuilder<int>(
-              valueListenable: _notifierCounter,
-              builder: (context, count, child) {
-                return Text(
-                  'ValueNotifier Counter: $count | Input: $_inputText',
-                  fontSize: theme.defaultFontSize,
-                  color: theme.primaryColor,
+            const SizedBox(height: 15.0),
+            Button(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  PageRoute(
+                    builder: (ctx) => const DetailScreen(),
+                  ),
                 );
               },
+              child: const Text('Push Detail Screen via Navigator'),
             ),
             const SizedBox(height: 15.0),
-            Row(
-              children: [
-                Button(
-                  onPressed: () {
-                    _notifierCounter.value++;
-                  },
-                  child: const Text('Increment ValueNotifier'),
-                ),
-                const SizedBox(width: 10.0),
-                Expanded(
-                  child: TextField(
-                    placeholder: 'Type native input...',
-                    onChanged: (val) {
-                      setState(() {
-                        _inputText = val;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15.0),
-            GestureDetector(
-              onTap: () {
-                print('Native GestureDetector tapped!');
+            FutureBuilder<String>(
+              future: Future.value('Async Data Loaded via FutureBuilder'),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return Text(snapshot.data ?? '', color: theme.primaryColor);
+                }
+                return const Text('Loading async future data...');
               },
-              child: Container(
-                backgroundColor: '#EEEEEE',
-                child: const Padding(
-                  padding: 10.0,
-                  child: Text('Tap me! (GestureDetector Native Interop)', color: '#008800'),
-                ),
-              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DetailScreen extends StatelessWidget {
+  const DetailScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      backgroundColor: '#EEEEEE',
+      child: Padding(
+        padding: 20.0,
+        child: Column(
+          children: [
+            Text(
+              'Flutter Zero Screen #2 (Detail Screen)',
+              fontSize: theme.defaultFontSize + 4.0,
+              color: theme.textColor,
             ),
             const SizedBox(height: 15.0),
-            const Text('Embedded Platform Native Views:', fontSize: 14.0),
-            const SizedBox(height: 5.0),
-            const Row(
-              children: [
-                Expanded(
-                  child: AndroidNativeView(
-                    viewType: 'com.example.native_map',
-                    creationParams: {'zoom': 12},
-                  ),
-                ),
-                SizedBox(width: 10.0),
-                Expanded(
-                  child: UIKitNativeView(
-                    viewType: 'com.example.native_camera',
-                    creationParams: {'quality': 'high'},
-                  ),
-                ),
-              ],
+            Button(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Pop Back to Home Screen'),
             ),
           ],
         ),
@@ -115,26 +90,30 @@ void main() {
   );
 
   final app = FlutterZeroApp(
-    rootWidget: const Theme(
+    rootWidget: Theme(
       data: themeData,
-      child: CounterApp(),
+      child: Navigator(
+        initialRoutes: [
+          PageRoute(builder: (ctx) => const HomeScreen()),
+        ],
+      ),
     ),
     backend: backend,
   );
 
-  print('=== Initializing Flutter Zero App with ValueNotifier & Native Views ===');
+  print('=== Initializing Flutter Zero App with Navigator & FutureBuilder ===');
   app.run();
 
-  print('\n=== Native View Tree After Initial Mount ===');
+  print('\n=== Native View Tree on Home Screen ===');
   print(backend.printTree());
 
   final buttonViews = backend.views.values.where((v) => v.widgetType == 'Button').toList();
   if (buttonViews.isNotEmpty) {
     final buttonView = buttonViews.first;
-    print('\n>>> Simulating native click on ValueNotifier Button #${buttonView.handle}...');
+    print('\n>>> Simulating click on "Push Detail Screen" Button #${buttonView.handle}...');
     backend.dispatchNativeEvent(buttonView.handle, 'click', {});
   }
 
-  print('\n=== Native View Tree After Reactive ValueNotifier Update ===');
+  print('\n=== Native View Tree After Navigator Push ===');
   print(backend.printTree());
 }

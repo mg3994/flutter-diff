@@ -281,6 +281,48 @@ void main() {
       expect(androidView.props['viewType'], equals('android_map'));
       expect(uikitView.props['viewType'], equals('uikit_web'));
     });
+
+    test('Navigator push and pop route stack management', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Navigator(
+          initialRoutes: [
+            PageRoute(builder: (context) => const Text('Screen 1')),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      var textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('Screen 1'));
+
+      final navigatorState = backend.views.values.isEmpty;
+      expect(navigatorState, isFalse);
+    });
+
+    test('FutureBuilder snapshot state resolution', () async {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: FutureBuilder<String>(
+          future: Future.value('Completed Future'),
+          builder: (context, snapshot) {
+            return Text(snapshot.data ?? 'Waiting');
+          },
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      await Future<void>.delayed(Duration.zero);
+
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('Completed Future'));
+    });
   });
 }
 

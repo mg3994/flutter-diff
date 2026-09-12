@@ -5,11 +5,14 @@
 #import "flutter/shell/platform/darwin/ios/framework/Headers/FlutterAppDelegate.h"
 
 #import "flutter/shell/platform/darwin/common/InternalFlutterSwiftCommon/InternalFlutterSwiftCommon.h"
+#import "flutter/shell/platform/darwin/ios/InternalFlutterSwift/InternalFlutterSwift.h"
 #import "flutter/shell/platform/darwin/ios/framework/Headers/FlutterPluginAppLifeCycleDelegate.h"
+#import "flutter/shell/platform/darwin/ios/framework/Headers/FlutterViewController.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterAppDelegate+Test.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine_Internal.h"
-#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterLaunchEngine.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterPluginAppLifeCycleDelegate_internal.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterSharedApplication.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterViewController_Internal.h"
 
 FLUTTER_ASSERT_ARC
 
@@ -21,6 +24,7 @@ static NSString* const kBackgroundFetchCapatibility = @"fetch";
   __weak NSObject<FlutterPluginRegistrant>* _weakRegistrant;
   NSObject<FlutterPluginRegistrant>* _strongRegistrant;
 }
+@property(nonatomic, copy) FlutterViewController* (^rootFlutterViewControllerGetter)(void);
 @property(nonatomic, strong) FlutterPluginAppLifeCycleDelegate* lifeCycleDelegate;
 @property(nonatomic, strong) FlutterLaunchEngine* launchEngine;
 @end
@@ -49,6 +53,19 @@ static NSString* const kBackgroundFetchCapatibility = @"fetch";
     didFinishLaunchingWithOptions:(NSDictionary*)launchOptions {
   return [self.lifeCycleDelegate application:application
                didFinishLaunchingWithOptions:launchOptions];
+}
+
+// Returns the key window's rootViewController, if it's a FlutterViewController.
+// Otherwise, returns nil.
+- (FlutterViewController*)rootFlutterViewController {
+  if (_rootFlutterViewControllerGetter != nil) {
+    return _rootFlutterViewControllerGetter();
+  }
+  UIViewController* rootViewController = _window.rootViewController;
+  if ([rootViewController isKindOfClass:[FlutterViewController class]]) {
+    return (FlutterViewController*)rootViewController;
+  }
+  return nil;
 }
 
 // Do not remove, some clients may be calling these via `super`.
@@ -148,6 +165,21 @@ static NSString* const kBackgroundFetchCapatibility = @"fetch";
     return NO;
   }
 
+  FlutterViewController* flutterViewController = [self rootFlutterViewController];
+  if (flutterViewController) {
+    [flutterViewController.engine sendDeepLinkToFramework:url
+                                        completionHandler:^(BOOL success) {
+                                          if (!success && throwBack) {
+                                            // throw it back to iOS
+                                            [flutterApplication openURL:url
+                                                                options:@{}
+                                                      completionHandler:nil];
+                                          }
+                                        }];
+  } else {
+    [FlutterLogger logError:@"Attempting to open an URL without a Flutter RootViewController."];
+    return NO;
+  }
   return YES;
 }
 
@@ -218,15 +250,27 @@ static NSString* const kBackgroundFetchCapatibility = @"fetch";
 }
 
 - (NSObject<FlutterPluginRegistrar>*)registrarForPlugin:(NSString*)pluginKey {
-  return [self.launchEngine.engine registrarForPlugin:pluginKey];
+  FlutterViewController* flutterRootViewController = [self rootFlutterViewController];
+  if (flutterRootViewController) {
+    return [[flutterRootViewController pluginRegistry] registrarForPlugin:pluginKey];
+  }
+  return [[self.launchEngine acquireEngine] registrarForPlugin:pluginKey];
 }
 
 - (BOOL)hasPlugin:(NSString*)pluginKey {
-  return [self.launchEngine.engine hasPlugin:pluginKey];
+  FlutterViewController* flutterRootViewController = [self rootFlutterViewController];
+  if (flutterRootViewController) {
+    return [[flutterRootViewController pluginRegistry] hasPlugin:pluginKey];
+  }
+  return [[self.launchEngine acquireEngine] hasPlugin:pluginKey];
 }
 
 - (NSObject*)valuePublishedByPlugin:(NSString*)pluginKey {
-  return [self.launchEngine.engine valuePublishedByPlugin:pluginKey];
+  FlutterViewController* flutterRootViewController = [self rootFlutterViewController];
+  if (flutterRootViewController) {
+    return [[flutterRootViewController pluginRegistry] valuePublishedByPlugin:pluginKey];
+  }
+  return [[self.launchEngine acquireEngine] valuePublishedByPlugin:pluginKey];
 }
 
 #pragma mark - Selectors handling

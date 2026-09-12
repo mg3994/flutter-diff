@@ -17,7 +17,7 @@
 ^flutter/buildtools/.*
 ^flutter/impeller/fixtures/.*
 ^flutter/prebuilts/.*
-^flutter/shell/platform/fuchsia/dart-pkg/zircon_ffi/lib/zircon_ffi.dart
+^flutter/shell/platform/fuchsia/dart_pkg/zircon_ffi/lib/zircon_ffi.dart
 ^flutter/sky/packages/sky_engine/LICENSE
 ^flutter/testing/.*
 ^flutter/third_party/android_tools/.*
@@ -43,6 +43,7 @@
 ^flutter/third_party/harfbuzz/src/harfbuzz.cc
 ^flutter/third_party/harfbuzz/util/.*
 ^flutter/third_party/icu/scripts/.*
+^flutter/third_party/imgui/.*
 ^flutter/third_party/inja/third_party/amalgamate/.*
 ^flutter/third_party/inja/third_party/include/doctest/.*
 ^flutter/third_party/java/.*
@@ -73,6 +74,7 @@
 ^flutter/third_party/vulkan-deps/spirv-headers/.*
 ^flutter/third_party/vulkan-deps/vulkan-headers/src/LICENSE\.md$
 ^flutter/third_party/vulkan-deps/vulkan-loader/.*
+^flutter/third_party/vulkan-deps/vulkan-utility-libraries/src/LICENSES/CC-BY-4.0.txt
 ^flutter/third_party/vulkan-deps/vulkan-utility-libraries/src/LICENSE.md$
 ^flutter/third_party/vulkan-deps/vulkan-utility-libraries/src/scripts/.*
 ^flutter/tools/android_sdk/packages\.txt$

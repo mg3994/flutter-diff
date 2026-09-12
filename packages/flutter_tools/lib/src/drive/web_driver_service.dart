@@ -72,7 +72,6 @@ class WebDriverService extends DriverService {
     String? userIdentifier,
     String? mainPath,
     Map<String, Object> platformArgs = const <String, Object>{},
-    Map<String, String> webDefines = const <String, String>{},
   }) async {
     final FlutterDevice flutterDevice = await FlutterDevice.create(
       device,
@@ -99,7 +98,6 @@ class WebDriverService extends DriverService {
             ),
       platformArgs: platformArgs,
       stayResident: true,
-      webDefines: webDefines,
       flutterProject: FlutterProject.current(),
       fileSystem: globals.fs,
       analytics: globals.analytics,

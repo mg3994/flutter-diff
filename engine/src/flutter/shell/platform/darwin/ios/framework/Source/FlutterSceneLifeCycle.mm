@@ -123,6 +123,28 @@ FLUTTER_ASSERT_ARC
       i--;
       continue;
     }
+
+    // There aren't any events that inform us when a UIWindow changes scenes.
+    // If a developer moves an entire UIWindow to a different scene and that window has a
+    // FlutterView inside of it, its engine will still be in its original scene's
+    // FlutterPluginSceneLifeCycleDelegate. The best we can do is move the engine to the correct
+    // scene here. Due to this, when moving a UIWindow from one scene to another, its first scene
+    // event may be lost. Since Flutter does not fully support multi-scene and this is an edge
+    // case, this is a loss we can deal with. To workaround this, the developer can move the
+    // UIView instead of the UIWindow, which will use willMoveToWindow to add/remove the engine from
+    // the scene.
+    UIWindowScene* actualScene = engine.viewController.view.window.windowScene;
+    if (actualScene != nil && actualScene != scene) {
+      [self.flutterManagedEngines removePointerAtIndex:i];
+      i--;
+
+      if ([actualScene.delegate conformsToProtocol:@protocol(FlutterSceneLifeCycleProvider)]) {
+        id<FlutterSceneLifeCycleProvider> lifeCycleProvider =
+            (id<FlutterSceneLifeCycleProvider>)actualScene.delegate;
+        [lifeCycleProvider.sceneLifeCycleDelegate addFlutterManagedEngine:engine];
+      }
+      continue;
+    }
   }
 }
 
@@ -170,6 +192,15 @@ FLUTTER_ASSERT_ARC
     willConnectToSession:(UISceneSession*)session
                  options:(UISceneConnectionOptions*)connectionOptions {
   self.connectionOptions = connectionOptions;
+  if ([scene.delegate conformsToProtocol:@protocol(UIWindowSceneDelegate)]) {
+    NSObject<UIWindowSceneDelegate>* sceneDelegate =
+        (NSObject<UIWindowSceneDelegate>*)scene.delegate;
+    if ([sceneDelegate.window.rootViewController isKindOfClass:[FlutterViewController class]]) {
+      FlutterViewController* rootViewController =
+          (FlutterViewController*)sceneDelegate.window.rootViewController;
+      [self addFlutterManagedEngine:rootViewController.engine];
+    }
+  }
 
   [self updateFlutterManagedEnginesInScene:scene];
 
@@ -327,6 +358,20 @@ FLUTTER_ASSERT_ARC
   }
 
   [self updateFlutterManagedEnginesInScene:scene];
+  int64_t appBundleModifiedTime = FlutterSharedApplication.lastAppModificationTime;
+  for (FlutterEngine* engine in [self allEngines]) {
+    FlutterViewController* vc = (FlutterViewController*)engine.viewController;
+    NSString* restorationId = vc.restorationIdentifier;
+    if (restorationId) {
+      NSData* restorationData = [engine.restorationPlugin restorationData];
+      if (restorationData) {
+        [activity addUserInfoEntriesFromDictionary:@{restorationId : restorationData}];
+        [activity addUserInfoEntriesFromDictionary:@{
+          kRestorationStateAppModificationKey : [NSNumber numberWithLongLong:appBundleModifiedTime]
+        }];
+      }
+    }
+  }
 
   return activity;
 }
@@ -345,6 +390,17 @@ FLUTTER_ASSERT_ARC
   if (appBundleModifiedTime != stateDate) {
     // Don't restore state if the app has been re-installed since the state was last saved
     return;
+  }
+
+  for (FlutterEngine* engine in [self allEngines]) {
+    UIViewController* vc = (UIViewController*)engine.viewController;
+    NSString* restorationId = vc.restorationIdentifier;
+    if (restorationId) {
+      NSData* restorationData = userInfo[restorationId];
+      if ([restorationData isKindOfClass:[NSData class]]) {
+        [engine.restorationPlugin setRestorationData:restorationData];
+      }
+    }
   }
 }
 
@@ -407,6 +463,16 @@ FLUTTER_ASSERT_ARC
   if (!FlutterSharedApplication.isFlutterDeepLinkingEnabled) {
     return NO;
   }
+  // if deep linking is enabled, send it to the framework
+  [engine sendDeepLinkToFramework:url
+                completionHandler:^(BOOL success) {
+                  if (!success && throwBack) {
+                    // throw it back to iOS
+                    [FlutterSharedApplication.application openURL:url
+                                                          options:@{}
+                                                completionHandler:nil];
+                  }
+                }];
   return YES;
 }
 

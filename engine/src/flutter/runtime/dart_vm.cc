@@ -6,7 +6,6 @@
 
 #include <sys/stat.h>
 
-#include <algorithm>
 #include <sstream>
 #include <vector>
 
@@ -22,6 +21,7 @@
 #include "flutter/runtime/ptrace_check.h"
 #include "third_party/dart/runtime/bin/platform.h"
 #include "third_party/dart/runtime/include/bin/dart_io_api.h"
+#include "third_party/skia/include/core/SkExecutor.h"
 #include "third_party/tonic/converter/dart_converter.h"
 #include "third_party/tonic/dart_class_library.h"
 #include "third_party/tonic/dart_class_provider.h"
@@ -43,21 +43,13 @@ static const char* kDartAllConfigsArgs[] = {
 
 static const char* kDartPrecompilationArgs[] = {"--precompilation"};
 
-static const char* kSerialGCArgs[] = {
-    // clang-format off
-    "--concurrent_mark=false",
-    "--concurrent_sweep=false",
-    "--compactor_tasks=1",
-    "--scavenger_tasks=0",
-    "--marker_tasks=0",
-    // clang-format on
-};
-
-[[maybe_unused]] static const char* kDartWriteProtectCodeArgs[] = {
+[[maybe_unused]]
+static const char* kDartWriteProtectCodeArgs[] = {
     "--no_write_protect_code",
 };
 
-[[maybe_unused]] static const char* kDartDisableIntegerDivisionArgs[] = {
+[[maybe_unused]]
+static const char* kDartDisableIntegerDivisionArgs[] = {
     "--no_use_integer_division",
 };
 
@@ -89,7 +81,8 @@ static std::string DartFileRecorderArgs(const std::string& path) {
 // events will only be recorded by the VM's timeline recorders when
 // |Switch::ProfileMicrotasks| is set.
 
-[[maybe_unused]] static const char* kDartDefaultTraceStreamsArgs[]{
+[[maybe_unused]]
+static const char* kDartDefaultTraceStreamsArgs[]{
     "--timeline_streams=Dart,Embedder,GC,Microtask",
 };
 
@@ -275,12 +268,19 @@ DartVM::DartVM(const std::shared_ptr<const DartVMData>& vm_data,
                          2,
                      kMinCount,
                      kMaxCount))),
+      skia_concurrent_executor_(
+          [runner = concurrent_message_loop_->GetTaskRunner()](
+              const fml::closure& work) { runner->PostTask(work); }),
       vm_data_(vm_data),
       isolate_name_server_(std::move(isolate_name_server)),
       service_protocol_(std::make_shared<ServiceProtocol>()) {
   TRACE_EVENT0("flutter", "DartVMInitializer");
 
   gVMLaunchCount++;
+
+  // Setting the executor is not thread safe but Dart VM initialization is. So
+  // this call is thread-safe.
+  SkExecutor::SetDefault(&skia_concurrent_executor_);
 
   FML_DCHECK(vm_data_);
   FML_DCHECK(isolate_name_server_);
@@ -355,13 +355,6 @@ DartVM::DartVM(const std::shared_ptr<const DartVMData>& vm_data,
 
   if (enable_asserts) {
     PushBackAll(&args, kDartAssertArgs, std::size(kDartAssertArgs));
-  }
-
-  // On low power devices with lesser number of cores, using concurrent
-  // marking or sweeping causes contention for the UI thread leading to
-  // Jank, this option can be used to turn off all concurrent GC activities.
-  if (settings_.enable_serial_gc) {
-    PushBackAll(&args, kSerialGCArgs, std::size(kSerialGCArgs));
   }
 
   if (settings_.start_paused) {
@@ -498,6 +491,10 @@ DartVM::DartVM(const std::shared_ptr<const DartVMData>& vm_data,
 }
 
 DartVM::~DartVM() {
+  // Setting the executor is not thread safe but Dart VM shutdown is. So
+  // this call is thread-safe.
+  SkExecutor::SetDefault(nullptr);
+
   if (Dart_CurrentIsolate() != nullptr) {
     Dart_ExitIsolate();
   }

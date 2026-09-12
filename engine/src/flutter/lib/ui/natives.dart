@@ -43,7 +43,63 @@ class _Logger {
 // constant and can't propagate into the set/get calls.
 const Endian _kFakeHostEndian = Endian.little;
 
+// A service protocol extension to schedule a frame to be rendered into the
+// window.
+Future<developer.ServiceExtensionResponse> _scheduleFrame(
+  String method,
+  Map<String, String> parameters,
+) async {
+  // Schedule the frame.
+  PlatformDispatcher.instance.scheduleFrame();
+  // Always succeed.
+  return developer.ServiceExtensionResponse.result(
+    json.encode(<String, String>{'type': 'Success'}),
+  );
+}
+
+Future<developer.ServiceExtensionResponse> _reinitializeShader(
+  String method,
+  Map<String, String> parameters,
+) async {
+  final String? assetKey = parameters['assetKey'];
+  if (assetKey != null) {
+    FragmentProgram._reinitializeShader(assetKey);
+  }
+
+  // Always succeed.
+  return developer.ServiceExtensionResponse.result(
+    json.encode(<String, String>{'type': 'Success'}),
+  );
+}
+
+Future<developer.ServiceExtensionResponse> _getImpellerEnabled(
+  String method,
+  Map<String, String> parameters,
+) async {
+  return developer.ServiceExtensionResponse.result(
+    json.encode(<String, Object>{'type': 'Success', 'enabled': _impellerEnabled}),
+  );
+}
+
 const bool _kReleaseMode = bool.fromEnvironment('dart.vm.product');
+
+@pragma('vm:entry-point')
+void _setupHooks() {
+  assert(() {
+    // In debug mode, register the schedule frame extension.
+    developer.registerExtension('ext.ui.window.scheduleFrame', _scheduleFrame);
+
+    // In debug mode, allow shaders to be reinitialized.
+    developer.registerExtension('ext.ui.window.reinitializeShader', _reinitializeShader);
+
+    return true;
+  }());
+
+  // In debug and profile mode, allow tools to display the current rendering backend.
+  if (!_kReleaseMode) {
+    developer.registerExtension('ext.ui.window.impellerEnabled', _getImpellerEnabled);
+  }
+}
 
 @Native<Void Function(Handle)>(symbol: 'DartRuntimeHooks::ScheduleMicrotask')
 external void _scheduleMicrotask(void Function() callback);
@@ -67,3 +123,22 @@ typedef _ScheduleImmediateClosure = void Function(void Function());
 // See also https://github.com/dart-lang/sdk/blob/main/sdk/lib/_internal/vm/lib/schedule_microtask_patch.dart
 @pragma('vm:entry-point')
 _ScheduleImmediateClosure _getScheduleMicrotaskClosure() => _scheduleMicrotask;
+
+// Used internally to indicate whether the Engine is using Impeller for
+// rendering.
+@pragma('vm:entry-point')
+bool _impellerEnabled = false;
+
+// Used internally to indicate whether the embedder enables the implicit view,
+// and the implicit view's ID if so.
+//
+// The exact value of this variable is an implementation detail that may change
+// at any time. Apps should always use PlatformDispatcher.implicitView to
+// determine the current implicit view, if any.
+@pragma('vm:entry-point')
+int? _implicitViewId;
+
+// Used internally to indicate whether isolates running on the platform thread
+// are enabled.
+@pragma('vm:entry-point')
+bool _platformIsolatesEnabled = false;

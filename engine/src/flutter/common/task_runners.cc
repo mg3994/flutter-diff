@@ -10,10 +10,14 @@ namespace flutter {
 
 TaskRunners::TaskRunners(std::string label,
                          fml::RefPtr<fml::TaskRunner> platform,
-                         fml::RefPtr<fml::TaskRunner> ui)
+                         fml::RefPtr<fml::TaskRunner> raster,
+                         fml::RefPtr<fml::TaskRunner> ui,
+                         fml::RefPtr<fml::TaskRunner> io)
     : label_(std::move(label)),
       platform_(std::move(platform)),
-      ui_(std::move(ui)) {}
+      raster_(std::move(raster)),
+      ui_(std::move(ui)),
+      io_(std::move(io)) {}
 
 TaskRunners::TaskRunners(const TaskRunners& other) = default;
 
@@ -31,8 +35,16 @@ fml::RefPtr<fml::TaskRunner> TaskRunners::GetUITaskRunner() const {
   return ui_;
 }
 
+fml::RefPtr<fml::TaskRunner> TaskRunners::GetIOTaskRunner() const {
+  return io_;
+}
+
+fml::RefPtr<fml::TaskRunner> TaskRunners::GetRasterTaskRunner() const {
+  return raster_;
+}
+
 bool TaskRunners::IsValid() const {
-  return platform_ && ui_;
+  return platform_ && raster_ && ui_ && io_;
 }
 
 }  // namespace flutter

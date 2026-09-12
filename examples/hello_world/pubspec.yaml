@@ -1,19 +1,22 @@
 name: hello_world
-description: "A new Flutter project."
-publish_to: 'none'
-version: 0.1.0+1
-
-resolution: workspace
 
 environment:
-  sdk: ^3.11.0-169.0.dev
+  sdk: ^3.11.0-0
+
+resolution: workspace
 
 dependencies:
   flutter:
     sdk: flutter
 
-dev_dependencies:
-#  flutter_test:
-#    sdk: flutter
-  flutter_lints: ^6.0.0
 
+dev_dependencies:
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  test: any
+
+  webdriver: any
+
+# PUBSPEC CHECKSUM: mut18q

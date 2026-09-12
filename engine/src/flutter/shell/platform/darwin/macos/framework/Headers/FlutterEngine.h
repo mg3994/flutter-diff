@@ -15,6 +15,11 @@
 #import "FlutterHourFormat.h"
 #import "FlutterMacros.h"
 #import "FlutterPluginRegistrarMacOS.h"
+#import "FlutterTexture.h"
+
+// TODO(stuartmorgan): Merge this file with the iOS FlutterEngine.h.
+
+@class FlutterViewController;
 
 /**
  * Coordinates a single instance of execution of a Flutter engine.
@@ -23,7 +28,8 @@
  * code.
  */
 FLUTTER_DARWIN_EXPORT
-@interface FlutterEngine : NSObject <FlutterPluginRegistry>
+@interface FlutterEngine
+    : NSObject <FlutterTextureRegistry, FlutterPluginRegistry, FlutterAppLifecycleDelegate>
 
 /**
  * Initializes an engine with the given project.
@@ -34,6 +40,17 @@ FLUTTER_DARWIN_EXPORT
  */
 - (nonnull instancetype)initWithName:(nonnull NSString*)labelPrefix
                              project:(nullable FlutterDartProject*)project;
+
+/**
+ * Initializes an engine that can run headlessly with the given project.
+ *
+ * @param labelPrefix Currently unused; in the future, may be used for labelling threads
+ *                    as with the iOS FlutterEngine.
+ * @param project The project configuration. If nil, a default FlutterDartProject will be used.
+ */
+- (nonnull instancetype)initWithName:(nonnull NSString*)labelPrefix
+                             project:(nullable FlutterDartProject*)project
+              allowHeadlessExecution:(BOOL)allowHeadlessExecution NS_DESIGNATED_INITIALIZER;
 
 - (nonnull instancetype)init NS_UNAVAILABLE;
 
@@ -52,6 +69,22 @@ FLUTTER_DARWIN_EXPORT
  * @return YES if the call succeeds in creating and running a Flutter Engine instance; NO otherwise.
  */
 - (BOOL)runWithEntrypoint:(nullable NSString*)entrypoint;
+
+/**
+ * The `FlutterViewController` of this engine, if any.
+ *
+ * This view is used by legacy APIs that assume a single view.
+ *
+ * Setting this field from nil to a non-nil view controller also updates
+ * the view controller's engine and ID.
+ *
+ * Setting this field from non-nil to nil will terminate the engine if
+ * allowHeadlessExecution is NO.
+ *
+ * Setting this field from non-nil to a different non-nil FlutterViewController
+ * is prohibited and will throw an assertion error.
+ */
+@property(nonatomic, nullable, weak) FlutterViewController* viewController;
 
 /**
  * The `FlutterBinaryMessenger` for communicating with this engine.

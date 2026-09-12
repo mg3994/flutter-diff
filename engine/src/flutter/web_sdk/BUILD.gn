@@ -16,14 +16,19 @@ web_ui_sources = exec_script("list_dart_files.py",
                              "list lines")
 
 web_engine_libraries = [
+  ":skwasm_impl_library",
+  ":skwasm_stub_library",
   ":web_engine_library",
   ":web_ui_library",
   ":web_ui_ui_web",
   ":web_ui_library_sources",
+  ":web_test_fonts_library",
+  ":web_locale_keymap_library",
 ]
 
 group("web_sdk") {
   deps = [
+    ":flutter_ddc_modules",
     ":flutter_platform_dills",
     "//flutter/lib/web_ui/flutter_js",
   ]
@@ -47,6 +52,38 @@ sdk_rewriter("web_engine_library") {
   api_file = "//flutter/lib/web_ui/lib/src/engine.dart"
   input_dir = "//flutter/lib/web_ui/lib/src/engine/"
   output_dir = "$root_out_dir/flutter_web_sdk/lib/_engine/"
+
+  # exclude skwasm, it will be a separate internal library
+  exclude_pattern = rebase_path("//flutter/lib/web_ui/lib/src/engine/skwasm")
+}
+
+sdk_rewriter("skwasm_stub_library") {
+  library_name = "skwasm_stub"
+  api_file = "//flutter/lib/web_ui/lib/src/engine/skwasm/skwasm_stub.dart"
+  input_dir = "//flutter/lib/web_ui/lib/src/engine/skwasm/skwasm_stub/"
+  output_dir = "$root_out_dir/flutter_web_sdk/lib/_skwasm_stub/"
+}
+
+sdk_rewriter("skwasm_impl_library") {
+  library_name = "skwasm_impl"
+  api_file = "//flutter/lib/web_ui/lib/src/engine/skwasm/skwasm_impl.dart"
+  input_dir = "//flutter/lib/web_ui/lib/src/engine/skwasm/skwasm_impl/"
+  output_dir = "$root_out_dir/flutter_web_sdk/lib/_skwasm_impl/"
+}
+
+sdk_rewriter("web_test_fonts_library") {
+  library_name = "web_test_fonts"
+  api_file = "//flutter/third_party/web_test_fonts/lib/web_test_fonts.dart"
+  input_dir = "//flutter/third_party/web_test_fonts/lib/web_test_fonts/"
+  output_dir = "$root_out_dir/flutter_web_sdk/lib/_web_test_fonts/"
+}
+
+sdk_rewriter("web_locale_keymap_library") {
+  library_name = "web_locale_keymap"
+  api_file =
+      "//flutter/third_party/web_locale_keymap/lib/web_locale_keymap.dart"
+  input_dir = "//flutter/third_party/web_locale_keymap/lib/web_locale_keymap/"
+  output_dir = "$root_out_dir/flutter_web_sdk/lib/_web_locale_keymap/"
 }
 
 copy("web_ui_library") {
@@ -180,6 +217,12 @@ template("_compile_platform") {
     if (defined(invoker.null_environment) && invoker.null_environment) {
       args += [ "--null-environment" ]
     }
+    skwasm_library = "dart:_skwasm_stub"
+    if (invoker.kernel_target == "dart2wasm") {
+      skwasm_library = "dart:_skwasm_impl"
+    } else if (invoker.kernel_target == "ddc") {
+      args += [ "--include-unsupported-platform-library-stubs" ]
+    }
 
     args += [
       "--target",
@@ -204,6 +247,10 @@ template("_compile_platform") {
       "dart:ui_web",
       "--source",
       "dart:_engine",
+      "--source",
+      skwasm_library,
+      "--source",
+      "dart:_web_locale_keymap",
     ]
     if (flutter_prebuilt_dart_sdk) {
       args += [
@@ -276,6 +323,8 @@ template("_compile_ddc_module") {
       "dart:ui",
       "dart:ui_web",
       "dart:_engine",
+      "dart:_skwasm_stub",
+      "dart:_web_locale_keymap",
       "--no-summarize",
       "--packages",
       "file:///" + rebase_path(dart_sdk_package_config),
@@ -288,6 +337,7 @@ template("_compile_ddc_module") {
       "--libraries-file",
       "org-dartlang-sdk:///libraries.json",
       "--inline-source-map",
+      "-DFLUTTER_WEB_USE_SKIA=true",
       "--modules",
       invoker.module_format,
       "-o",
@@ -314,7 +364,7 @@ template("_compile_ddc_modules") {
   forward_variables_from(invoker, "*")
 
   # We compile multiple times instead of passing multiple modules to a single
-  # compile as the DDC library bundle flutter_platform_dillsformat cannot be used when passing
+  # compile as the DDC library bundle format cannot be used when passing
   # multiple module formats as arguments.
   _compile_ddc_module("${target_name}_amd") {
     sdk_path_prefix = "amd"
@@ -349,6 +399,16 @@ if (!is_fuchsia) {
              ":flutter_platform_dills",
            ] + web_engine_libraries
 
+    if (is_wasm) {
+      deps += [
+        "//flutter/third_party/canvaskit:canvaskit_chromium_group",
+        "//flutter/third_party/canvaskit:canvaskit_group",
+        "//flutter/third_party/canvaskit:canvaskit_webparagraph_group",
+        "//flutter/third_party/canvaskit:skwasm_group",
+        "//flutter/third_party/canvaskit:skwasm_heavy_group",
+        "//flutter/third_party/canvaskit:wimp_group",
+      ]
+    }
     deps += [ "//flutter/lib/web_ui/flutter_js" ]
 
     # flutter_ddc_modules
@@ -360,6 +420,28 @@ if (!is_fuchsia) {
     sources += get_target_outputs(":flutter_dartdevc_kernel_sdk_outline")
     sources += get_target_outputs(":flutter_dart2js_kernel_sdk_full")
     sources += get_target_outputs(":flutter_dart2wasm_kernel_sdk_full")
+    if (is_wasm) {
+      sources += [
+        "$root_out_dir/flutter_web_sdk/canvaskit/canvaskit.js",
+        "$root_out_dir/flutter_web_sdk/canvaskit/canvaskit.js.symbols",
+        "$root_out_dir/flutter_web_sdk/canvaskit/canvaskit.wasm",
+        "$root_out_dir/flutter_web_sdk/canvaskit/chromium/canvaskit.js",
+        "$root_out_dir/flutter_web_sdk/canvaskit/chromium/canvaskit.js.symbols",
+        "$root_out_dir/flutter_web_sdk/canvaskit/chromium/canvaskit.wasm",
+        "$root_out_dir/flutter_web_sdk/canvaskit/skwasm.js",
+        "$root_out_dir/flutter_web_sdk/canvaskit/skwasm.js.symbols",
+        "$root_out_dir/flutter_web_sdk/canvaskit/skwasm.wasm",
+        "$root_out_dir/flutter_web_sdk/canvaskit/skwasm_heavy.js",
+        "$root_out_dir/flutter_web_sdk/canvaskit/skwasm_heavy.js.symbols",
+        "$root_out_dir/flutter_web_sdk/canvaskit/skwasm_heavy.wasm",
+        "$root_out_dir/flutter_web_sdk/canvaskit/webparagraph/canvaskit.js",
+        "$root_out_dir/flutter_web_sdk/canvaskit/webparagraph/canvaskit.js.symbols",
+        "$root_out_dir/flutter_web_sdk/canvaskit/webparagraph/canvaskit.wasm",
+        "$root_out_dir/flutter_web_sdk/canvaskit/wimp.js",
+        "$root_out_dir/flutter_web_sdk/canvaskit/wimp.js.symbols",
+        "$root_out_dir/flutter_web_sdk/canvaskit/wimp.wasm",
+      ]
+    }
 
     # flutter.js full sources
     foreach(source, flutter_js_source_list) {

@@ -6,7 +6,6 @@
 
 #include "flutter/benchmarking/benchmarking.h"
 #include "flutter/fml/logging.h"
-#include "flutter/fml/synchronization/waitable_event.h"
 #include "flutter/runtime/dart_vm.h"
 #include "flutter/shell/common/thread_host.h"
 #include "flutter/testing/elf_loader.h"
@@ -48,16 +47,21 @@ static void StartupAndShutdownShell(benchmark::State& state,
 
     thread_host = std::make_unique<ThreadHost>(ThreadHost::ThreadHostConfig(
         "io.flutter.bench.",
-        ThreadHost::Type::kPlatform | ThreadHost::Type::kUi));
+        ThreadHost::Type::kPlatform | ThreadHost::Type::kRaster |
+            ThreadHost::Type::kIo | ThreadHost::Type::kUi));
 
     TaskRunners task_runners("test",
                              thread_host->platform_thread->GetTaskRunner(),
-                             thread_host->ui_thread->GetTaskRunner());
+                             thread_host->raster_thread->GetTaskRunner(),
+                             thread_host->ui_thread->GetTaskRunner(),
+                             thread_host->io_thread->GetTaskRunner());
 
     shell = Shell::Create(
-        flutter::PlatformData(), task_runners, settings, [](Shell& shell) {
+        flutter::PlatformData(), task_runners, settings,
+        [](Shell& shell) {
           return std::make_unique<PlatformView>(shell, shell.GetTaskRunners());
-        });
+        },
+        [](Shell& shell) { return std::make_unique<Rasterizer>(shell); });
   }
 
   FML_CHECK(shell);

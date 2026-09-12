@@ -5,8 +5,333 @@
 part of dart.ui;
 
 @pragma('vm:entry-point')
+void _addView(
+  int viewId,
+  double devicePixelRatio,
+  double width,
+  double height,
+  double viewPaddingTop,
+  double viewPaddingRight,
+  double viewPaddingBottom,
+  double viewPaddingLeft,
+  double viewInsetTop,
+  double viewInsetRight,
+  double viewInsetBottom,
+  double viewInsetLeft,
+  double systemGestureInsetTop,
+  double systemGestureInsetRight,
+  double systemGestureInsetBottom,
+  double systemGestureInsetLeft,
+  double physicalTouchSlop,
+  List<double> displayFeaturesBounds,
+  List<int> displayFeaturesType,
+  List<int> displayFeaturesState,
+  int displayId,
+  double minWidth,
+  double maxWidth,
+  double minHeight,
+  double maxHeight,
+  double displayCornerRadiusTopLeft,
+  double displayCornerRadiusTopRight,
+  double displayCornerRadiusBottomRight,
+  double displayCornerRadiusBottomLeft,
+) {
+  final _ViewConfiguration viewConfiguration = _buildViewConfiguration(
+    devicePixelRatio,
+    width,
+    height,
+    viewPaddingTop,
+    viewPaddingRight,
+    viewPaddingBottom,
+    viewPaddingLeft,
+    viewInsetTop,
+    viewInsetRight,
+    viewInsetBottom,
+    viewInsetLeft,
+    systemGestureInsetTop,
+    systemGestureInsetRight,
+    systemGestureInsetBottom,
+    systemGestureInsetLeft,
+    physicalTouchSlop,
+    displayFeaturesBounds,
+    displayFeaturesType,
+    displayFeaturesState,
+    displayId,
+    minWidth,
+    maxWidth,
+    minHeight,
+    maxHeight,
+    displayCornerRadiusTopLeft,
+    displayCornerRadiusTopRight,
+    displayCornerRadiusBottomRight,
+    displayCornerRadiusBottomLeft,
+  );
+  PlatformDispatcher.instance._addView(viewId, viewConfiguration);
+}
+
+@pragma('vm:entry-point')
+void _removeView(int viewId) {
+  PlatformDispatcher.instance._removeView(viewId);
+}
+
+@pragma('vm:entry-point')
+void _sendViewFocusEvent(int viewId, int viewFocusState, int viewFocusDirection) {
+  final viewFocusEvent = ViewFocusEvent(
+    viewId: viewId,
+    state: ViewFocusState.values[viewFocusState],
+    direction: ViewFocusDirection.values[viewFocusDirection],
+  );
+  PlatformDispatcher.instance._sendViewFocusEvent(viewFocusEvent);
+}
+
+@pragma('vm:entry-point')
 void _setEngineId(int engineId) {
   PlatformDispatcher.instance._engineId = engineId;
+}
+
+@pragma('vm:entry-point')
+void _updateDisplays(
+  List<int> ids,
+  List<double> widths,
+  List<double> heights,
+  List<double> devicePixelRatios,
+  List<double> refreshRates,
+) {
+  assert(ids.length == widths.length);
+  assert(ids.length == heights.length);
+  assert(ids.length == devicePixelRatios.length);
+  assert(ids.length == refreshRates.length);
+  final displays = <Display>[];
+  for (var index = 0; index < ids.length; index += 1) {
+    final int displayId = ids[index];
+    displays.add(
+      Display._(
+        id: displayId,
+        size: Size(widths[index], heights[index]),
+        devicePixelRatio: devicePixelRatios[index],
+        refreshRate: refreshRates[index],
+      ),
+    );
+  }
+
+  PlatformDispatcher.instance._updateDisplays(displays);
+}
+
+List<DisplayFeature> _decodeDisplayFeatures({
+  required List<double> bounds,
+  required List<int> type,
+  required List<int> state,
+  required double devicePixelRatio,
+}) {
+  assert(bounds.length / 4 == type.length, 'Bounds are rectangles, requiring 4 measurements each');
+  assert(type.length == state.length);
+  final result = <DisplayFeature>[];
+  for (var i = 0; i < type.length; i++) {
+    final int rectOffset = i * 4;
+    result.add(
+      DisplayFeature(
+        bounds: Rect.fromLTRB(
+          bounds[rectOffset] / devicePixelRatio,
+          bounds[rectOffset + 1] / devicePixelRatio,
+          bounds[rectOffset + 2] / devicePixelRatio,
+          bounds[rectOffset + 3] / devicePixelRatio,
+        ),
+        type: DisplayFeatureType.values[type[i]],
+        state: state[i] < DisplayFeatureState.values.length
+            ? DisplayFeatureState.values[state[i]]
+            : DisplayFeatureState.unknown,
+      ),
+    );
+  }
+  return result;
+}
+
+DisplayCornerRadii? _decodeDisplayCornerRadii({
+  required double displayCornerRadiusTopLeft,
+  required double displayCornerRadiusTopRight,
+  required double displayCornerRadiusBottomRight,
+  required double displayCornerRadiusBottomLeft,
+}) {
+  assert(() {
+    final isTopLeftSet = displayCornerRadiusTopLeft != _kUnsetDisplayCornerRadius;
+    final bool isConsistent =
+        (displayCornerRadiusTopRight != _kUnsetDisplayCornerRadius) == isTopLeftSet &&
+        (displayCornerRadiusBottomRight != _kUnsetDisplayCornerRadius) == isTopLeftSet &&
+        (displayCornerRadiusBottomLeft != _kUnsetDisplayCornerRadius) == isTopLeftSet;
+
+    if (!isConsistent) {
+      throw ArgumentError(
+        'The display corner radii must be either all set or all unset.\n'
+        'Provided values were inconsistent:\n'
+        '  TopLeft: $displayCornerRadiusTopLeft\n'
+        '  TopRight: $displayCornerRadiusTopRight\n'
+        '  BottomRight: $displayCornerRadiusBottomRight\n'
+        '  BottomLeft: $displayCornerRadiusBottomLeft',
+      );
+    }
+    return true;
+  }());
+
+  if (displayCornerRadiusTopLeft == _kUnsetDisplayCornerRadius ||
+      displayCornerRadiusTopRight == _kUnsetDisplayCornerRadius ||
+      displayCornerRadiusBottomRight == _kUnsetDisplayCornerRadius ||
+      displayCornerRadiusBottomLeft == _kUnsetDisplayCornerRadius) {
+    return null;
+  }
+
+  return DisplayCornerRadii(
+    topLeft: displayCornerRadiusTopLeft,
+    topRight: displayCornerRadiusTopRight,
+    bottomRight: displayCornerRadiusBottomRight,
+    bottomLeft: displayCornerRadiusBottomLeft,
+  );
+}
+
+_ViewConfiguration _buildViewConfiguration(
+  double devicePixelRatio,
+  double width,
+  double height,
+  double viewPaddingTop,
+  double viewPaddingRight,
+  double viewPaddingBottom,
+  double viewPaddingLeft,
+  double viewInsetTop,
+  double viewInsetRight,
+  double viewInsetBottom,
+  double viewInsetLeft,
+  double systemGestureInsetTop,
+  double systemGestureInsetRight,
+  double systemGestureInsetBottom,
+  double systemGestureInsetLeft,
+  double physicalTouchSlop,
+  List<double> displayFeaturesBounds,
+  List<int> displayFeaturesType,
+  List<int> displayFeaturesState,
+  int displayId,
+  double minWidth,
+  double maxWidth,
+  double minHeight,
+  double maxHeight,
+  double displayCornerRadiusTopLeft,
+  double displayCornerRadiusTopRight,
+  double displayCornerRadiusBottomRight,
+  double displayCornerRadiusBottomLeft,
+) {
+  return _ViewConfiguration(
+    devicePixelRatio: devicePixelRatio,
+    size: Size(width, height),
+    viewPadding: ViewPadding._(
+      top: viewPaddingTop,
+      right: viewPaddingRight,
+      bottom: viewPaddingBottom,
+      left: viewPaddingLeft,
+    ),
+    viewInsets: ViewPadding._(
+      top: viewInsetTop,
+      right: viewInsetRight,
+      bottom: viewInsetBottom,
+      left: viewInsetLeft,
+    ),
+    padding: ViewPadding._(
+      top: math.max(0.0, viewPaddingTop - viewInsetTop),
+      right: math.max(0.0, viewPaddingRight - viewInsetRight),
+      bottom: math.max(0.0, viewPaddingBottom - viewInsetBottom),
+      left: math.max(0.0, viewPaddingLeft - viewInsetLeft),
+    ),
+    systemGestureInsets: ViewPadding._(
+      top: math.max(0.0, systemGestureInsetTop),
+      right: math.max(0.0, systemGestureInsetRight),
+      bottom: math.max(0.0, systemGestureInsetBottom),
+      left: math.max(0.0, systemGestureInsetLeft),
+    ),
+    gestureSettings: GestureSettings(
+      physicalTouchSlop: physicalTouchSlop == _kUnsetGestureSetting ? null : physicalTouchSlop,
+    ),
+    displayFeatures: _decodeDisplayFeatures(
+      bounds: displayFeaturesBounds,
+      type: displayFeaturesType,
+      state: displayFeaturesState,
+      devicePixelRatio: devicePixelRatio,
+    ),
+    displayId: displayId,
+    viewConstraints: ViewConstraints(
+      minWidth: minWidth,
+      maxWidth: maxWidth,
+      minHeight: minHeight,
+      maxHeight: maxHeight,
+    ),
+    displayCornerRadii: _decodeDisplayCornerRadii(
+      displayCornerRadiusTopLeft: displayCornerRadiusTopLeft,
+      displayCornerRadiusTopRight: displayCornerRadiusTopRight,
+      displayCornerRadiusBottomRight: displayCornerRadiusBottomRight,
+      displayCornerRadiusBottomLeft: displayCornerRadiusBottomLeft,
+    ),
+  );
+}
+
+@pragma('vm:entry-point')
+void _updateWindowMetrics(
+  int viewId,
+  double devicePixelRatio,
+  double width,
+  double height,
+  double viewPaddingTop,
+  double viewPaddingRight,
+  double viewPaddingBottom,
+  double viewPaddingLeft,
+  double viewInsetTop,
+  double viewInsetRight,
+  double viewInsetBottom,
+  double viewInsetLeft,
+  double systemGestureInsetTop,
+  double systemGestureInsetRight,
+  double systemGestureInsetBottom,
+  double systemGestureInsetLeft,
+  double physicalTouchSlop,
+  List<double> displayFeaturesBounds,
+  List<int> displayFeaturesType,
+  List<int> displayFeaturesState,
+  int displayId,
+  double minWidth,
+  double maxWidth,
+  double minHeight,
+  double maxHeight,
+  double displayCornerRadiusTopLeft,
+  double displayCornerRadiusTopRight,
+  double displayCornerRadiusBottomRight,
+  double displayCornerRadiusBottomLeft,
+) {
+  final _ViewConfiguration viewConfiguration = _buildViewConfiguration(
+    devicePixelRatio,
+    width,
+    height,
+    viewPaddingTop,
+    viewPaddingRight,
+    viewPaddingBottom,
+    viewPaddingLeft,
+    viewInsetTop,
+    viewInsetRight,
+    viewInsetBottom,
+    viewInsetLeft,
+    systemGestureInsetTop,
+    systemGestureInsetRight,
+    systemGestureInsetBottom,
+    systemGestureInsetLeft,
+    physicalTouchSlop,
+    displayFeaturesBounds,
+    displayFeaturesType,
+    displayFeaturesState,
+    displayId,
+    minWidth,
+    maxWidth,
+    minHeight,
+    maxHeight,
+    displayCornerRadiusTopLeft,
+    displayCornerRadiusTopRight,
+    displayCornerRadiusBottomRight,
+    displayCornerRadiusBottomLeft,
+  );
+  PlatformDispatcher.instance._updateWindowMetrics(viewId, viewConfiguration);
 }
 
 typedef _LocaleClosure = String Function();
@@ -20,13 +345,72 @@ void _updateLocales(List<String> locales) {
 }
 
 @pragma('vm:entry-point')
+void _updateUserSettingsData(String jsonData) {
+  PlatformDispatcher.instance._updateUserSettingsData(jsonData);
+}
+
+@pragma('vm:entry-point')
+void _updateInitialLifecycleState(String state) {
+  PlatformDispatcher.instance._updateInitialLifecycleState(state);
+}
+
+@pragma('vm:entry-point')
+void _updateSemanticsEnabled(bool enabled) {
+  PlatformDispatcher.instance._updateSemanticsEnabled(enabled);
+}
+
+@pragma('vm:entry-point')
+void _updateAccessibilityFeatures(int values) {
+  PlatformDispatcher.instance._updateAccessibilityFeatures(values);
+}
+
+@pragma('vm:entry-point')
 void _dispatchPlatformMessage(String name, ByteData? data, int responseId) {
   PlatformDispatcher.instance._dispatchPlatformMessage(name, data, responseId);
 }
 
 @pragma('vm:entry-point')
-void _invokeHotRestartListeners() {
-  PlatformDispatcher.instance._invokeHotRestartListeners();
+void _dispatchPointerDataPacket(ByteData packet) {
+  PlatformDispatcher.instance._dispatchPointerDataPacket(packet);
+}
+
+@pragma('vm:entry-point')
+class _HitTestResponse {
+  _HitTestResponse({required this.hasPlatformView});
+
+  @pragma('vm:entry-point')
+  final bool hasPlatformView;
+}
+
+@pragma('vm:entry-point')
+_HitTestResponse _hitTest(int viewId, double x, double y) {
+  assert(PlatformDispatcher.instance._views.containsKey(viewId), 'View $viewId does not exist.');
+  final FlutterView view = PlatformDispatcher.instance._views[viewId]!;
+  final offset = Offset(x, y);
+  final request = HitTestRequest(view: view, offset: offset);
+  final HitTestResponse response = PlatformDispatcher.instance._hitTest(request);
+  return _HitTestResponse(hasPlatformView: response.hasPlatformView);
+}
+
+@pragma('vm:entry-point')
+void _dispatchSemanticsAction(int viewId, int nodeId, int action, ByteData? args) {
+  PlatformDispatcher.instance._dispatchSemanticsAction(viewId, nodeId, action, args);
+}
+
+@pragma('vm:entry-point')
+void _beginFrame(int microseconds, int frameNumber) {
+  PlatformDispatcher.instance._beginFrame(microseconds);
+  PlatformDispatcher.instance._updateFrameData(frameNumber);
+}
+
+@pragma('vm:entry-point')
+void _reportTimings(List<int> timings) {
+  PlatformDispatcher.instance._reportTimings(timings);
+}
+
+@pragma('vm:entry-point')
+void _drawFrame() {
+  PlatformDispatcher.instance._drawFrame();
 }
 
 @pragma('vm:entry-point')
@@ -115,6 +499,30 @@ void _invoke3<A1, A2, A3>(
     zone.runGuarded(() {
       callback(arg1, arg2, arg3);
     });
+  }
+}
+
+/// Invokes [callback] inside the given [zone] passing it [arg1],
+/// and returns a nullable result of the specified type.
+///
+/// The 1 in the name refers to the number of arguments expected by
+/// the callback (and thus passed to this function, in addition to the
+/// callback itself and the zone in which the callback is executed).
+R? _invoke1WithReturn<A1, R>(R Function(A1 a1)? callback, Zone zone, A1 arg1) {
+  if (callback == null) {
+    return null;
+  }
+  if (identical(zone, Zone.current)) {
+    return callback(arg1);
+  } else {
+    return runZonedGuarded(
+      () {
+        return callback(arg1);
+      },
+      (e, s) {
+        zone.handleUncaughtError(e, s);
+      },
+    );
   }
 }
 

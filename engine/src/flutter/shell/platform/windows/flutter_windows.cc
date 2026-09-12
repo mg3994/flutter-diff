@@ -6,15 +6,24 @@
 
 #include <io.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
 #include <memory>
+#include <vector>
 
+#include "flutter/shell/platform/common/client_wrapper/include/flutter/plugin_registrar.h"
 #include "flutter/shell/platform/common/incoming_message_dispatcher.h"
+#include "flutter/shell/platform/common/path_utils.h"
 #include "flutter/shell/platform/embedder/embedder.h"
+#include "flutter/shell/platform/windows/dpi_utils.h"
 #include "flutter/shell/platform/windows/flutter_project_bundle.h"
+#include "flutter/shell/platform/windows/flutter_window.h"
 #include "flutter/shell/platform/windows/flutter_windows_engine.h"
-#include "flutter/shell/platform/windows/flutter_windows_internal.h"
+#include "flutter/shell/platform/windows/flutter_windows_view.h"
+#include "flutter/shell/platform/windows/flutter_windows_view_controller.h"
+#include "flutter/shell/platform/windows/window_binding_handler.h"
 #include "flutter/shell/platform/windows/window_state.h"
 
 static_assert(FLUTTER_ENGINE_VERSION == 1, "");
@@ -29,6 +38,147 @@ static flutter::FlutterWindowsEngine* EngineFromHandle(
 static FlutterDesktopEngineRef HandleForEngine(
     flutter::FlutterWindowsEngine* engine) {
   return reinterpret_cast<FlutterDesktopEngineRef>(engine);
+}
+
+static flutter::FlutterWindowsViewController* ViewControllerFromHandle(
+    FlutterDesktopViewControllerRef ref) {
+  return reinterpret_cast<flutter::FlutterWindowsViewController*>(ref);
+}
+
+static FlutterDesktopViewControllerRef HandleForViewController(
+    flutter::FlutterWindowsViewController* view_controller) {
+  return reinterpret_cast<FlutterDesktopViewControllerRef>(view_controller);
+}
+
+// Returns the view corresponding to the given opaque API handle.
+static flutter::FlutterWindowsView* ViewFromHandle(FlutterDesktopViewRef ref) {
+  return reinterpret_cast<flutter::FlutterWindowsView*>(ref);
+}
+
+// Returns the opaque API handle for the given view instance.
+static FlutterDesktopViewRef HandleForView(flutter::FlutterWindowsView* view) {
+  return reinterpret_cast<FlutterDesktopViewRef>(view);
+}
+
+// Returns the texture registrar corresponding to the given opaque API handle.
+static flutter::FlutterWindowsTextureRegistrar* TextureRegistrarFromHandle(
+    FlutterDesktopTextureRegistrarRef ref) {
+  return reinterpret_cast<flutter::FlutterWindowsTextureRegistrar*>(ref);
+}
+
+// Returns the opaque API handle for the given texture registrar instance.
+static FlutterDesktopTextureRegistrarRef HandleForTextureRegistrar(
+    flutter::FlutterWindowsTextureRegistrar* registrar) {
+  return reinterpret_cast<FlutterDesktopTextureRegistrarRef>(registrar);
+}
+
+// Creates a view controller that might own the engine.
+//
+// If `owns_engine` is true, then the returned `FlutterDesktopViewControllerRef`
+// owns `engine_ref` and will deallocate `engine_ref` upon its own destruction.
+static FlutterDesktopViewControllerRef CreateViewController(
+    FlutterDesktopEngineRef engine_ref,
+    int width,
+    int height,
+    bool owns_engine) {
+  flutter::FlutterWindowsEngine* engine_ptr = EngineFromHandle(engine_ref);
+  std::unique_ptr<flutter::WindowBindingHandler> window_wrapper =
+      std::make_unique<flutter::FlutterWindow>(
+          width, height, engine_ptr->display_manager(),
+          engine_ptr->windows_proc_table());
+
+  std::unique_ptr<flutter::FlutterWindowsEngine> engine;
+  if (owns_engine) {
+    engine = std::unique_ptr<flutter::FlutterWindowsEngine>(engine_ptr);
+  }
+
+  std::unique_ptr<flutter::FlutterWindowsView> view = engine_ptr->CreateView(
+      std::move(window_wrapper), false, flutter::BoxConstraints());
+  if (!view) {
+    return nullptr;
+  }
+
+  auto controller = std::make_unique<flutter::FlutterWindowsViewController>(
+      std::move(engine), std::move(view));
+
+  // Launch the engine if it is not running already.
+  if (!controller->engine()->running()) {
+    if (!controller->engine()->Run()) {
+      return nullptr;
+    }
+  }
+
+  // Must happen after engine is running.
+  controller->view()->SendInitialBounds();
+
+  // The Windows embedder listens to accessibility updates using the
+  // view's HWND. The embedder's accessibility features may be stale if
+  // the app was in headless mode.
+  controller->engine()->UpdateAccessibilityFeatures();
+
+  return HandleForViewController(controller.release());
+}
+
+FlutterDesktopViewControllerRef FlutterDesktopViewControllerCreate(
+    int width,
+    int height,
+    FlutterDesktopEngineRef engine) {
+  return CreateViewController(engine, width, height, /*owns_engine=*/true);
+}
+
+FlutterDesktopViewControllerRef FlutterDesktopEngineCreateViewController(
+    FlutterDesktopEngineRef engine,
+    const FlutterDesktopViewControllerProperties* properties) {
+  return CreateViewController(engine, properties->width, properties->height,
+                              /*owns_engine=*/false);
+}
+
+void FlutterDesktopViewControllerDestroy(FlutterDesktopViewControllerRef ref) {
+  auto controller = ViewControllerFromHandle(ref);
+  controller->Destroy();
+  delete controller;
+}
+
+FlutterDesktopViewId FlutterDesktopViewControllerGetViewId(
+    FlutterDesktopViewControllerRef ref) {
+  auto controller = ViewControllerFromHandle(ref);
+  return static_cast<FlutterDesktopViewId>(controller->view()->view_id());
+}
+
+FlutterDesktopEngineRef FlutterDesktopViewControllerGetEngine(
+    FlutterDesktopViewControllerRef ref) {
+  auto controller = ViewControllerFromHandle(ref);
+  return HandleForEngine(controller->engine());
+}
+
+FlutterDesktopViewRef FlutterDesktopViewControllerGetView(
+    FlutterDesktopViewControllerRef ref) {
+  auto controller = ViewControllerFromHandle(ref);
+  return HandleForView(controller->view());
+}
+
+void FlutterDesktopViewControllerForceRedraw(
+    FlutterDesktopViewControllerRef ref) {
+  auto controller = ViewControllerFromHandle(ref);
+  controller->view()->ForceRedraw();
+}
+
+bool FlutterDesktopViewControllerHandleTopLevelWindowProc(
+    FlutterDesktopViewControllerRef ref,
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam,
+    LRESULT* result) {
+  auto controller = ViewControllerFromHandle(ref);
+  std::optional<LRESULT> delegate_result =
+      controller->engine()
+          ->window_proc_delegate_manager()
+          ->OnTopLevelWindowProc(hwnd, message, wparam, lparam);
+  if (delegate_result) {
+    *result = *delegate_result;
+  }
+  return delegate_result.has_value();
 }
 
 FlutterDesktopEngineRef FlutterDesktopEngineCreate(
@@ -48,7 +198,8 @@ bool FlutterDesktopEngineDestroy(FlutterDesktopEngineRef engine_ref) {
   return result;
 }
 
-FlutterDesktopEngineRef FlutterDesktopEngineForId(int64_t engine_id) {
+FLUTTER_EXPORT FlutterDesktopEngineRef
+FlutterDesktopEngineForId(int64_t engine_id) {
   return HandleForEngine(
       flutter::FlutterWindowsEngine::GetEngineForId(engine_id));
 }
@@ -67,6 +218,10 @@ uint64_t FlutterDesktopEngineProcessMessages(FlutterDesktopEngineRef engine) {
   return std::chrono::nanoseconds::max().count();
 }
 
+void FlutterDesktopEngineReloadSystemFonts(FlutterDesktopEngineRef engine) {
+  EngineFromHandle(engine)->ReloadSystemFonts();
+}
+
 FlutterDesktopPluginRegistrarRef FlutterDesktopEngineGetPluginRegistrar(
     FlutterDesktopEngineRef engine,
     const char* plugin_name) {
@@ -80,6 +235,144 @@ FlutterDesktopPluginRegistrarRef FlutterDesktopEngineGetPluginRegistrar(
 FlutterDesktopMessengerRef FlutterDesktopEngineGetMessenger(
     FlutterDesktopEngineRef engine) {
   return EngineFromHandle(engine)->messenger();
+}
+
+FlutterDesktopTextureRegistrarRef FlutterDesktopEngineGetTextureRegistrar(
+    FlutterDesktopEngineRef engine) {
+  return HandleForTextureRegistrar(
+      EngineFromHandle(engine)->texture_registrar());
+}
+
+void FlutterDesktopEngineSetNextFrameCallback(FlutterDesktopEngineRef engine,
+                                              VoidCallback callback,
+                                              void* user_data) {
+  EngineFromHandle(engine)->SetNextFrameCallback(
+      [callback, user_data]() { callback(user_data); });
+}
+
+bool FlutterDesktopEngineIsPlatformThread(FlutterDesktopEngineRef engine) {
+  return EngineFromHandle(engine)->task_runner()->RunsTasksOnCurrentThread();
+}
+
+void FlutterDesktopEnginePostPlatformThreadTask(FlutterDesktopEngineRef engine,
+                                                VoidCallback callback,
+                                                VoidCallback on_cancel,
+                                                void* user_data) {
+  FML_DCHECK(callback) << "Callback must not be null";
+  struct Context {
+    VoidCallback callback;
+    VoidCallback on_cancel;
+    void* user_data;
+    bool invoked = false;
+
+    ~Context() {
+      if (!invoked && on_cancel) {
+        on_cancel(user_data);
+      }
+    }
+  };
+
+  auto context =
+      std::make_shared<Context>(Context{callback, on_cancel, user_data});
+  EngineFromHandle(engine)->task_runner()->PostTask([context]() {
+    context->invoked = true;
+    context->callback(context->user_data);
+  });
+}
+
+HWND FlutterDesktopViewGetHWND(FlutterDesktopViewRef view) {
+  return ViewFromHandle(view)->GetWindowHandle();
+}
+
+IDXGIAdapter* FlutterDesktopViewGetGraphicsAdapter(FlutterDesktopViewRef view) {
+  auto engine = ViewFromHandle(view)->GetEngine();
+  IDXGIAdapter* adapter;
+  if (!FlutterDesktopEngineGetGraphicsAdapter(HandleForEngine(engine),
+                                              &adapter)) {
+    return nullptr;
+  }
+  return adapter;
+}
+
+bool FlutterDesktopEngineGetGraphicsAdapter(FlutterDesktopEngineRef engine,
+                                            IDXGIAdapter** adapter_out) {
+  auto egl_manager = EngineFromHandle(engine)->egl_manager();
+  if (egl_manager) {
+    Microsoft::WRL::ComPtr<ID3D11Device> d3d_device;
+    Microsoft::WRL::ComPtr<IDXGIDevice> dxgi_device;
+    if (egl_manager->GetDevice(d3d_device.GetAddressOf()) &&
+        SUCCEEDED(d3d_device.As(&dxgi_device))) {
+      if (SUCCEEDED(dxgi_device->GetAdapter(adapter_out))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool FlutterDesktopEngineProcessExternalWindowMessage(
+    FlutterDesktopEngineRef engine,
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam,
+    LRESULT* result) {
+  std::optional<LRESULT> lresult =
+      EngineFromHandle(engine)->ProcessExternalWindowMessage(hwnd, message,
+                                                             wparam, lparam);
+  if (result && lresult.has_value()) {
+    *result = lresult.value();
+  }
+  return lresult.has_value();
+}
+
+void FlutterDesktopEngineRegisterPlatformViewType(
+    FlutterDesktopEngineRef engine,
+    const char* view_type_name,
+    FlutterPlatformViewTypeEntry view_type) {
+  // TODO(schectman): forward to platform view manager.
+  // https://github.com/flutter/flutter/issues/143375
+}
+
+FlutterDesktopViewRef FlutterDesktopPluginRegistrarGetView(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  return HandleForView(registrar->engine->view(flutter::kImplicitViewId));
+}
+
+FlutterDesktopViewRef FlutterDesktopPluginRegistrarGetViewById(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopViewId view_id) {
+  return HandleForView(registrar->engine->view(view_id));
+}
+
+void FlutterDesktopPluginRegistrarRegisterTopLevelWindowProcDelegate(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopWindowProcCallback delegate,
+    void* user_data) {
+  registrar->engine->window_proc_delegate_manager()
+      ->RegisterTopLevelWindowProcDelegate(delegate, user_data);
+}
+
+void FlutterDesktopPluginRegistrarUnregisterTopLevelWindowProcDelegate(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopWindowProcCallback delegate) {
+  registrar->engine->window_proc_delegate_manager()
+      ->UnregisterTopLevelWindowProcDelegate(delegate);
+}
+
+bool FlutterDesktopPluginRegistrarGetGraphicsAdapter(
+    FlutterDesktopPluginRegistrarRef registrar,
+    IDXGIAdapter** adapter_out) {
+  return FlutterDesktopEngineGetGraphicsAdapter(
+      HandleForEngine(registrar->engine), adapter_out);
+}
+
+UINT FlutterDesktopGetDpiForHWND(HWND hwnd) {
+  return flutter::GetDpiForHWND(hwnd);
+}
+
+UINT FlutterDesktopGetDpiForMonitor(HMONITOR monitor) {
+  return flutter::GetDpiForMonitor(monitor);
 }
 
 void FlutterDesktopResyncOutputStreams() {
@@ -178,4 +471,37 @@ FlutterDesktopMessengerRef FlutterDesktopMessengerLock(
 
 void FlutterDesktopMessengerUnlock(FlutterDesktopMessengerRef messenger) {
   flutter::FlutterDesktopMessenger::FromRef(messenger)->GetMutex().unlock();
+}
+
+FlutterDesktopTextureRegistrarRef FlutterDesktopRegistrarGetTextureRegistrar(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  return HandleForTextureRegistrar(registrar->engine->texture_registrar());
+}
+
+int64_t FlutterDesktopTextureRegistrarRegisterExternalTexture(
+    FlutterDesktopTextureRegistrarRef texture_registrar,
+    const FlutterDesktopTextureInfo* texture_info) {
+  return TextureRegistrarFromHandle(texture_registrar)
+      ->RegisterTexture(texture_info);
+}
+
+void FlutterDesktopTextureRegistrarUnregisterExternalTexture(
+    FlutterDesktopTextureRegistrarRef texture_registrar,
+    int64_t texture_id,
+    void (*callback)(void* user_data),
+    void* user_data) {
+  auto registrar = TextureRegistrarFromHandle(texture_registrar);
+  if (callback) {
+    registrar->UnregisterTexture(
+        texture_id, [callback, user_data]() { callback(user_data); });
+    return;
+  }
+  registrar->UnregisterTexture(texture_id);
+}
+
+bool FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable(
+    FlutterDesktopTextureRegistrarRef texture_registrar,
+    int64_t texture_id) {
+  return TextureRegistrarFromHandle(texture_registrar)
+      ->MarkTextureFrameAvailable(texture_id);
 }

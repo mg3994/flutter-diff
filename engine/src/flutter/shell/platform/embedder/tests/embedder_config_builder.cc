@@ -4,8 +4,11 @@
 
 #include "flutter/shell/platform/embedder/tests/embedder_config_builder.h"
 
+#include "flutter/common/constants.h"
+#include "flutter/runtime/dart_vm.h"
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "tests/embedder_test_context.h"
+#include "third_party/skia/include/core/SkImage.h"
 
 namespace flutter::testing {
 
@@ -30,9 +33,11 @@ EmbedderConfigBuilder::EmbedderConfigBuilder(
   if (preference != InitializationPreference::kNoInitialize) {
     SetAssetsPath();
     SetIsolateCreateCallbackHook();
+    SetSemanticsCallbackHooks();
     SetLogMessageCallbackHook();
     SetLocalizationCallbackHooks();
     SetChannelUpdateCallbackHook();
+    SetViewFocusChangeRequestHook();
     AddCommandLineArgument("--disable-vm-service");
 
     if (preference == InitializationPreference::kSnapshotsInitialize ||
@@ -87,6 +92,17 @@ void EmbedderConfigBuilder::SetIsolateCreateCallbackHook() {
       EmbedderTestContext::GetIsolateCreateCallbackHook();
 }
 
+void EmbedderConfigBuilder::SetSemanticsCallbackHooks() {
+  project_args_.update_semantics_callback2 =
+      context_.GetUpdateSemanticsCallback2Hook();
+  project_args_.update_semantics_callback =
+      context_.GetUpdateSemanticsCallbackHook();
+  project_args_.update_semantics_node_callback =
+      context_.GetUpdateSemanticsNodeCallbackHook();
+  project_args_.update_semantics_custom_action_callback =
+      context_.GetUpdateSemanticsCustomActionCallbackHook();
+}
+
 void EmbedderConfigBuilder::SetLogMessageCallbackHook() {
   project_args_.log_message_callback =
       EmbedderTestContext::GetLogMessageCallbackHook();
@@ -95,6 +111,11 @@ void EmbedderConfigBuilder::SetLogMessageCallbackHook() {
 void EmbedderConfigBuilder::SetChannelUpdateCallbackHook() {
   project_args_.channel_update_callback =
       context_.GetChannelUpdateCallbackHook();
+}
+
+void EmbedderConfigBuilder::SetViewFocusChangeRequestHook() {
+  project_args_.view_focus_change_request_callback =
+      context_.GetViewFocusChangeRequestCallbackHook();
 }
 
 void EmbedderConfigBuilder::SetLogTag(std::string tag) {
@@ -157,9 +178,85 @@ void EmbedderConfigBuilder::SetUITaskRunner(
   project_args_.custom_task_runners = &custom_task_runners_;
 }
 
+void EmbedderConfigBuilder::SetupVsyncCallback() {
+  project_args_.vsync_callback = [](void* user_data, intptr_t baton) {
+    auto context = reinterpret_cast<EmbedderTestContext*>(user_data);
+    context->RunVsyncCallback(baton);
+  };
+}
+
+void EmbedderConfigBuilder::SetRenderTaskRunner(
+    const FlutterTaskRunnerDescription* runner) {
+  if (runner == nullptr) {
+    return;
+  }
+
+  custom_task_runners_.render_task_runner = runner;
+  project_args_.custom_task_runners = &custom_task_runners_;
+}
+
 void EmbedderConfigBuilder::SetPlatformMessageCallback(
     const std::function<void(const FlutterPlatformMessage*)>& callback) {
   context_.SetPlatformMessageCallback(callback);
+}
+
+void EmbedderConfigBuilder::SetViewFocusChangeRequestCallback(
+    const std::function<void(const FlutterViewFocusChangeRequest*)>& callback) {
+  context_.SetViewFocusChangeRequestCallback(callback);
+}
+
+void EmbedderConfigBuilder::SetCompositor(bool avoid_backing_store_cache,
+                                          bool use_present_layers_callback) {
+  context_.SetupCompositor();
+  auto& compositor = context_.GetCompositor();
+  compositor_.struct_size = sizeof(compositor_);
+  compositor_.user_data = &compositor;
+  compositor_.create_backing_store_callback =
+      [](const FlutterBackingStoreConfig* config,  //
+         FlutterBackingStore* backing_store_out,   //
+         void* user_data                           //
+      ) {
+        return reinterpret_cast<EmbedderTestCompositor*>(user_data)
+            ->CreateBackingStore(config, backing_store_out);
+      };
+  compositor_.collect_backing_store_callback =
+      [](const FlutterBackingStore* backing_store,  //
+         void* user_data                            //
+      ) {
+        return reinterpret_cast<EmbedderTestCompositor*>(user_data)
+            ->CollectBackingStore(backing_store);
+      };
+  if (use_present_layers_callback) {
+    compositor_.present_layers_callback = [](const FlutterLayer** layers,
+                                             size_t layers_count,
+                                             void* user_data) {
+      auto compositor = reinterpret_cast<EmbedderTestCompositor*>(user_data);
+
+      // The present layers callback is incompatible with multiple views;
+      // it can only be used to render the implicit view.
+      return compositor->Present(kFlutterImplicitViewId, layers, layers_count);
+    };
+  } else {
+    compositor_.present_view_callback = [](const FlutterPresentViewInfo* info) {
+      auto compositor =
+          reinterpret_cast<EmbedderTestCompositor*>(info->user_data);
+
+      return compositor->Present(info->view_id, info->layers,
+                                 info->layers_count);
+    };
+  }
+  compositor_.avoid_backing_store_cache = avoid_backing_store_cache;
+  project_args_.compositor = &compositor_;
+}
+
+FlutterCompositor& EmbedderConfigBuilder::GetCompositor() {
+  return compositor_;
+}
+
+void EmbedderConfigBuilder::SetRenderTargetType(
+    EmbedderTestBackingStoreProducer::RenderTargetType type,
+    FlutterSoftwarePixelFormat software_pixfmt) {
+  context_.GetCompositor().SetRenderTargetType(type, software_pixfmt);
 }
 
 UniqueEngine EmbedderConfigBuilder::LaunchEngine() const {
@@ -208,11 +305,12 @@ UniqueEngine EmbedderConfigBuilder::SetupEngine(bool run) const {
     project_args.dart_entrypoint_argc = 0;
   }
 
-  auto result =
-      run ? FlutterEngineRun(FLUTTER_ENGINE_VERSION, &project_args, &context_,
-                             &engine)
-          : FlutterEngineInitialize(FLUTTER_ENGINE_VERSION, &project_args,
-                                    &context_, &engine);
+  auto result = run ? FlutterEngineRun(FLUTTER_ENGINE_VERSION,
+                                       &context_.GetRendererConfig(),
+                                       &project_args, &context_, &engine)
+                    : FlutterEngineInitialize(
+                          FLUTTER_ENGINE_VERSION, &context_.GetRendererConfig(),
+                          &project_args, &context_, &engine);
 
   if (result != kSuccess) {
     return {};

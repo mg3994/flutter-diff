@@ -9,11 +9,14 @@ import("//flutter/testing/testing.gni")
 _wrapper_includes = [
   "include/flutter/dart_project.h",
   "include/flutter/flutter_engine.h",
+  "include/flutter/flutter_view_controller.h",
+  "include/flutter/flutter_view.h",
   "include/flutter/plugin_registrar_windows.h",
 ]
 
 _wrapper_sources = [
   "flutter_engine.cc",
+  "flutter_view_controller.cc",
 ]
 
 # This code will be merged into .../common/client_wrapper for client use,
@@ -74,6 +77,8 @@ executable("client_wrapper_windows_unittests") {
   sources = [
     "dart_project_unittests.cc",
     "flutter_engine_unittests.cc",
+    "flutter_view_controller_unittests.cc",
+    "flutter_view_unittests.cc",
     "plugin_registrar_windows_unittests.cc",
   ]
 
@@ -104,6 +109,7 @@ client_wrapper_file_archive_list = [
 
 win_client_wrapper_file_archive_list = [
   "flutter_engine.cc",
+  "flutter_view_controller.cc",
 ]
 
 zip_bundle("client_wrapper_archive") {

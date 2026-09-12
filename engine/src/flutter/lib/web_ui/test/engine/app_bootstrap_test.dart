@@ -79,4 +79,22 @@ void testMain() {
     expect(initCalled, 1, reason: 'initEngine should have been called.');
     expect(runCalled, 2, reason: 'runApp should have been called.');
   });
+
+  group('FlutterApp', () {
+    test('addView/removeView respectively adds/removes view', () async {
+      final bootstrap = AppBootstrap(initializeEngine: mockInit, runApp: mockRunApp);
+
+      final FlutterEngineInitializer engineInitializer = bootstrap.prepareEngineInitializer();
+
+      final FlutterAppRunner appInitializer = await engineInitializer.initializeEngine(
+        JsFlutterConfiguration(multiViewEnabled: true),
+      );
+      final FlutterApp app = await appInitializer.runApp();
+      final int viewId = app.addView(JsFlutterViewOptions(hostElement: createDomElement('div')));
+      expect(bootstrap.viewManager[viewId], isNotNull);
+
+      app.removeView(viewId);
+      expect(bootstrap.viewManager[viewId], isNull);
+    });
+  });
 }

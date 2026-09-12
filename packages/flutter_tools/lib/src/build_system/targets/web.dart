@@ -94,7 +94,7 @@ class WebEntrypointTarget extends Target {
     // does not have an entry for the user's application or if the main file is
     // outside of the lib/ directory.
     final String importedEntrypoint =
-        packageConfig.toPackageUriForWorkspace(importUri)?.toString() ?? importUri.toString();
+        packageConfig.toPackageUri(importUri)?.toString() ?? importUri.toString();
 
     await injectBuildTimePluginFilesForWebPlatform(
       flutterProject,
@@ -984,11 +984,38 @@ class WebBuiltInAssets extends Target {
   @override
   List<Source> get inputs => const <Source>[Source.hostArtifact(HostArtifact.flutterWebSdk)];
 
+  Directory get _canvasKitDirectory => globals.fs.directory(
+    fileSystem.path.join(
+      globals.artifacts!.getHostArtifact(HostArtifact.flutterWebSdk).path,
+      'canvaskit',
+    ),
+  );
+
+  List<File> get _canvasKitFiles =>
+      _canvasKitDirectory.listSync(recursive: true).whereType<File>().toList();
+
+  String _filePathRelativeToCanvasKitDirectory(File file) =>
+      fileSystem.path.relative(file.path, from: _canvasKitDirectory.path);
+
   @override
-  List<Source> get outputs => <Source>[const Source.pattern('{BUILD_DIR}/flutter.js')];
+  List<Source> get outputs => <Source>[
+    const Source.pattern('{BUILD_DIR}/flutter.js'),
+    for (final File file in _canvasKitFiles)
+      Source.pattern('{BUILD_DIR}/canvaskit/${_filePathRelativeToCanvasKitDirectory(file)}'),
+  ];
 
   @override
   Future<void> build(Environment environment) async {
+    for (final File file in _canvasKitFiles) {
+      final String relativePath = _filePathRelativeToCanvasKitDirectory(file);
+      final String targetPath = fileSystem.path.join(
+        environment.outputDir.path,
+        'canvaskit',
+        relativePath,
+      );
+      file.copySync(targetPath);
+    }
+
     // Write the flutter.js file
     final String flutterJsOut = fileSystem.path.join(environment.outputDir.path, 'flutter.js');
     final File flutterJsFile = fileSystem.file(

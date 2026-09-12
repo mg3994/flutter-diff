@@ -9,8 +9,8 @@ solutions = [
     "safesync_url": "",
 
     # If you are using SSH to connect to GitHub, change the URL to:
-    # git@github.com:knopp/flutter_zero.git
-    "url": "https://github.com/knopp/flutter_zero.git",
+    # git@github.com:flutter/flutter.git
+    "url": "https://github.com/flutter/flutter.git",
 
     # Uncomment the custom_vars section below if you plan to build the web engine.
     # "custom_vars": {

@@ -81,6 +81,8 @@ TEST_F(DartIsolateTest, DartPluginRegistrantIsPresent) {
   auto thread = CreateNewThread();
   TaskRunners task_runners(GetCurrentTestName(),  //
                            thread,                //
+                           thread,                //
+                           thread,                //
                            thread                 //
   );
 
@@ -129,6 +131,8 @@ TEST_F(DartIsolateTest, DartPluginRegistrantFromBackgroundIsolate) {
   auto vm_ref = DartVMRef::Create(settings);
   auto thread = CreateNewThread();
   TaskRunners task_runners(GetCurrentTestName(),  //
+                           thread,                //
+                           thread,                //
                            thread,                //
                            thread                 //
   );
@@ -180,6 +184,8 @@ TEST_F(DartIsolateTest, DartPluginRegistrantNotFromBackgroundIsolate) {
   auto thread = CreateNewThread();
   TaskRunners task_runners(GetCurrentTestName(),  //
                            thread,                //
+                           thread,                //
+                           thread,                //
                            thread                 //
   );
 
@@ -230,6 +236,8 @@ TEST_F(DartIsolateTest, DartPluginRegistrantWhenRegisteringBackgroundIsolate) {
   auto vm_ref = DartVMRef::Create(settings);
   auto thread = CreateNewThread();
   TaskRunners task_runners(GetCurrentTestName(),  //
+                           thread,                //
+                           thread,                //
                            thread,                //
                            thread                 //
   );

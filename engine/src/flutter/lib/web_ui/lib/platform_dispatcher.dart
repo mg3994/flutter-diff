@@ -5,6 +5,13 @@
 part of ui;
 
 typedef VoidCallback = void Function();
+typedef ViewFocusChangeCallback = void Function(ViewFocusEvent viewFocusEvent);
+typedef FrameCallback = void Function(Duration duration);
+typedef TimingsCallback = void Function(List<FrameTiming> timings);
+typedef PointerDataPacketCallback = void Function(PointerDataPacket packet);
+typedef KeyDataCallback = bool Function(KeyData data);
+typedef SemanticsActionEventCallback = void Function(SemanticsActionEvent action);
+typedef HitTestCallback = HitTestResponse Function(HitTestRequest request);
 typedef PlatformMessageResponseCallback = void Function(ByteData? data);
 typedef PlatformMessageCallback =
     void Function(String name, ByteData? data, PlatformMessageResponseCallback? callback);
@@ -20,10 +27,45 @@ class RootIsolateToken {
 abstract class PlatformDispatcher {
   static PlatformDispatcher get instance => engine.EnginePlatformDispatcher.instance;
 
-  int? get engineId;
-
   VoidCallback? get onPlatformConfigurationChanged;
   set onPlatformConfigurationChanged(VoidCallback? callback);
+
+  Iterable<Display> get displays;
+
+  Iterable<FlutterView> get views;
+
+  FlutterView? view({required int id});
+
+  FlutterView? get implicitView;
+
+  int? get engineId;
+
+  VoidCallback? get onMetricsChanged;
+  set onMetricsChanged(VoidCallback? callback);
+
+  ViewFocusChangeCallback? get onViewFocusChange;
+  set onViewFocusChange(ViewFocusChangeCallback? callback);
+
+  void requestViewFocusChange({
+    required int viewId,
+    required ViewFocusState state,
+    required ViewFocusDirection direction,
+  });
+
+  FrameCallback? get onBeginFrame;
+  set onBeginFrame(FrameCallback? callback);
+
+  VoidCallback? get onDrawFrame;
+  set onDrawFrame(VoidCallback? callback);
+
+  PointerDataPacketCallback? get onPointerDataPacket;
+  set onPointerDataPacket(PointerDataPacketCallback? callback);
+
+  KeyDataCallback? get onKeyData;
+  set onKeyData(KeyDataCallback? callback);
+
+  TimingsCallback? get onReportTimings;
+  set onReportTimings(TimingsCallback? callback);
 
   void sendPlatformMessage(String name, ByteData? data, PlatformMessageResponseCallback? callback);
 
@@ -40,6 +82,37 @@ abstract class PlatformDispatcher {
 
   ByteData? getPersistentIsolateData() => null;
 
+  void scheduleFrame();
+
+  void scheduleWarmUpFrame({required VoidCallback beginFrame, required VoidCallback drawFrame});
+
+  void setSemanticsTreeEnabled(bool enabled) {}
+
+  void setApplicationLocale(Locale locale) {}
+
+  double? get lineHeightScaleFactorOverride;
+
+  double? get letterSpacingOverride;
+
+  double? get wordSpacingOverride;
+
+  double? get paragraphSpacingOverride;
+
+  AccessibilityFeatures get accessibilityFeatures;
+
+  VoidCallback? get onAccessibilityFeaturesChanged;
+  set onAccessibilityFeaturesChanged(VoidCallback? callback);
+
+  @Deprecated('''
+    In a multi-view world, the platform dispatcher can no longer provide apis
+    to update semantics since each view will host its own semantics tree.
+
+    Semantics updates must be passed to an individual [FlutterView]. To update
+    semantics, use PlatformDispatcher.instance.views to get a [FlutterView] and
+    call `updateSemantics`.
+  ''')
+  void updateSemantics(SemanticsUpdate update);
+
   Locale get locale;
 
   List<Locale> get locales;
@@ -49,13 +122,332 @@ abstract class PlatformDispatcher {
   VoidCallback? get onLocaleChanged;
   set onLocaleChanged(VoidCallback? callback);
 
+  String get initialLifecycleState => '';
+
   bool get alwaysUse24HourFormat;
+
+  double get textScaleFactor;
+
+  bool get nativeSpellCheckServiceDefined => false;
+
+  bool get supportsShowingSystemContextMenu => false;
+
+  bool get brieflyShowPassword => true;
+
+  VoidCallback? get onTextScaleFactorChanged;
+  set onTextScaleFactorChanged(VoidCallback? callback);
+
+  Brightness get platformBrightness;
+
+  VoidCallback? get onPlatformBrightnessChanged;
+  set onPlatformBrightnessChanged(VoidCallback? callback);
+
+  String? get systemFontFamily;
+
+  VoidCallback? get onSystemFontFamilyChanged;
+  set onSystemFontFamilyChanged(VoidCallback? callback);
+
+  bool get semanticsEnabled;
+
+  VoidCallback? get onSemanticsEnabledChanged;
+  set onSemanticsEnabledChanged(VoidCallback? callback);
+
+  SemanticsActionEventCallback? get onSemanticsActionEvent;
+  set onSemanticsActionEvent(SemanticsActionEventCallback? callback);
+
+  HitTestCallback? get onHitTest;
+  set onHitTest(HitTestCallback? callback);
 
   ErrorCallback? get onError;
   set onError(ErrorCallback? callback);
+
+  String get defaultRouteName;
+
+  FrameData get frameData;
+
+  VoidCallback? get onFrameDataChanged => null;
+  set onFrameDataChanged(VoidCallback? callback) {}
+
+  double scaleFontSize(double unscaledFontSize);
 }
 
-enum DartPerformanceMode { balanced, latency, throughput, memory }
+final class SystemColor {
+  const SystemColor({required this.name, this.value});
+  final String name;
+  final Color? value;
+  bool get isSupported => value != null;
+  static bool get platformProvidesSystemColors => true;
+
+  static final SystemColorPalette light = SystemColorPalette._(
+    engine.SystemColorPaletteDetector.light,
+  );
+
+  static final SystemColorPalette dark = SystemColorPalette._(
+    engine.SystemColorPaletteDetector.dark,
+  );
+}
+
+final class SystemColorPalette {
+  SystemColorPalette._(this._detector);
+
+  Brightness get brightness => _detector.brightness;
+
+  final engine.SystemColorPaletteDetector _detector;
+
+  SystemColor _lookUp(String name) {
+    return _detector.systemColors[name]!;
+  }
+
+  SystemColor get accentColor => _lookUp('AccentColor');
+  SystemColor get accentColorText => _lookUp('AccentColorText');
+  SystemColor get activeText => _lookUp('ActiveText');
+  SystemColor get buttonBorder => _lookUp('ButtonBorder');
+  SystemColor get buttonFace => _lookUp('ButtonFace');
+  SystemColor get buttonText => _lookUp('ButtonText');
+  SystemColor get canvas => _lookUp('Canvas');
+  SystemColor get canvasText => _lookUp('CanvasText');
+  SystemColor get field => _lookUp('Field');
+  SystemColor get fieldText => _lookUp('FieldText');
+  SystemColor get grayText => _lookUp('GrayText');
+  SystemColor get highlight => _lookUp('Highlight');
+  SystemColor get highlightText => _lookUp('HighlightText');
+  SystemColor get linkText => _lookUp('LinkText');
+  SystemColor get mark => _lookUp('Mark');
+  SystemColor get markText => _lookUp('MarkText');
+  SystemColor get selectedItem => _lookUp('SelectedItem');
+  SystemColor get selectedItemText => _lookUp('SelectedItemText');
+  SystemColor get visitedText => _lookUp('VisitedText');
+}
+
+enum FramePhase {
+  vsyncStart,
+  buildStart,
+  buildFinish,
+  rasterStart,
+  rasterFinish,
+  rasterFinishWallTime,
+}
+
+enum _FrameTimingInfo {
+  layerCacheCount,
+  layerCacheBytes,
+  pictureCacheCount,
+  pictureCacheBytes,
+  frameNumber,
+}
+
+class FrameTiming {
+  factory FrameTiming({
+    required int vsyncStart,
+    required int buildStart,
+    required int buildFinish,
+    required int rasterStart,
+    required int rasterFinish,
+    required int rasterFinishWallTime,
+    int layerCacheCount = 0,
+    int layerCacheBytes = 0,
+    int pictureCacheCount = 0,
+    int pictureCacheBytes = 0,
+    int frameNumber = 1,
+  }) {
+    return FrameTiming._(<int>[
+      vsyncStart,
+      buildStart,
+      buildFinish,
+      rasterStart,
+      rasterFinish,
+      rasterFinishWallTime,
+      layerCacheCount,
+      layerCacheBytes,
+      pictureCacheCount,
+      pictureCacheBytes,
+      frameNumber,
+    ]);
+  }
+
+  FrameTiming._(this._data) : assert(_data.length == _dataLength);
+
+  static final int _dataLength = FramePhase.values.length + _FrameTimingInfo.values.length;
+
+  int timestampInMicroseconds(FramePhase phase) => _data[phase.index];
+
+  Duration _rawDuration(FramePhase phase) => Duration(microseconds: _data[phase.index]);
+
+  int _rawInfo(_FrameTimingInfo info) => _data[FramePhase.values.length + info.index];
+
+  Duration get buildDuration =>
+      _rawDuration(FramePhase.buildFinish) - _rawDuration(FramePhase.buildStart);
+
+  Duration get rasterDuration =>
+      _rawDuration(FramePhase.rasterFinish) - _rawDuration(FramePhase.rasterStart);
+
+  Duration get vsyncOverhead =>
+      _rawDuration(FramePhase.buildStart) - _rawDuration(FramePhase.vsyncStart);
+
+  Duration get totalSpan =>
+      _rawDuration(FramePhase.rasterFinish) - _rawDuration(FramePhase.vsyncStart);
+
+  int get layerCacheCount => _rawInfo(_FrameTimingInfo.layerCacheCount);
+
+  int get layerCacheBytes => _rawInfo(_FrameTimingInfo.layerCacheBytes);
+
+  double get layerCacheMegabytes => layerCacheBytes / 1024.0 / 1024.0;
+
+  int get pictureCacheCount => _rawInfo(_FrameTimingInfo.pictureCacheCount);
+
+  int get pictureCacheBytes => _rawInfo(_FrameTimingInfo.pictureCacheBytes);
+
+  double get pictureCacheMegabytes => pictureCacheBytes / 1024.0 / 1024.0;
+
+  int get frameNumber => _data.last;
+
+  final List<int> _data; // some elements in microseconds, some in bytes, some are counts
+
+  String _formatMS(Duration duration) => '${duration.inMicroseconds * 0.001}ms';
+
+  @override
+  String toString() {
+    return '$runtimeType(buildDuration: ${_formatMS(buildDuration)}, '
+        'rasterDuration: ${_formatMS(rasterDuration)}, '
+        'vsyncOverhead: ${_formatMS(vsyncOverhead)}, '
+        'totalSpan: ${_formatMS(totalSpan)}, '
+        'layerCacheCount: $layerCacheCount, '
+        'layerCacheBytes: $layerCacheBytes, '
+        'pictureCacheCount: $pictureCacheCount, '
+        'pictureCacheBytes: $pictureCacheBytes, '
+        'frameNumber: ${_data.last})';
+  }
+}
+
+enum AppLifecycleState { detached, resumed, inactive, hidden, paused }
+
+enum AppExitResponse { exit, cancel }
+
+enum AppExitType { cancelable, required }
+
+abstract class ViewPadding {
+  const factory ViewPadding._({
+    required double left,
+    required double top,
+    required double right,
+    required double bottom,
+  }) = engine.ViewPadding;
+
+  double get left;
+  double get top;
+  double get right;
+  double get bottom;
+
+  static const ViewPadding zero = ViewPadding._(left: 0.0, top: 0.0, right: 0.0, bottom: 0.0);
+
+  @override
+  String toString() {
+    return 'ViewPadding(left: $left, top: $top, right: $right, bottom: $bottom)';
+  }
+}
+
+abstract class ViewConstraints {
+  const factory ViewConstraints({
+    double minWidth,
+    double maxWidth,
+    double minHeight,
+    double maxHeight,
+  }) = engine.ViewConstraints;
+
+  factory ViewConstraints.tight(Size size) = engine.ViewConstraints.tight;
+
+  double get minWidth;
+  double get maxWidth;
+  double get minHeight;
+  double get maxHeight;
+  bool isSatisfiedBy(Size size);
+  bool get isTight;
+  ViewConstraints operator /(double factor);
+}
+
+@Deprecated(
+  'Use ViewPadding instead. '
+  'This feature was deprecated after v3.8.0-14.0.pre.',
+)
+typedef WindowPadding = ViewPadding;
+
+class DisplayFeature {
+  const DisplayFeature({required this.bounds, required this.type, required this.state});
+
+  final Rect bounds;
+  final DisplayFeatureType type;
+  final DisplayFeatureState state;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+    return other is DisplayFeature &&
+        bounds == other.bounds &&
+        type == other.type &&
+        state == other.state;
+  }
+
+  @override
+  int get hashCode => Object.hash(bounds, type, state);
+
+  @override
+  String toString() {
+    return 'DisplayFeature(rect: $bounds, type: $type, state: $state)';
+  }
+}
+
+enum DisplayFeatureType { unknown, fold, hinge, cutout }
+
+enum DisplayFeatureState { unknown, postureFlat, postureHalfOpened, postureFlipped }
+
+class DisplayCornerRadii {
+  const DisplayCornerRadii({
+    required this.topLeft,
+    required this.topRight,
+    required this.bottomRight,
+    required this.bottomLeft,
+  }) : assert(topLeft >= 0),
+       assert(topRight >= 0),
+       assert(bottomRight >= 0),
+       assert(bottomLeft >= 0);
+
+  final double topLeft;
+
+  final double topRight;
+
+  final double bottomRight;
+
+  final double bottomLeft;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other.runtimeType != runtimeType) {
+      return false;
+    }
+    return other is DisplayCornerRadii &&
+        topLeft == other.topLeft &&
+        topRight == other.topRight &&
+        bottomRight == other.bottomRight &&
+        bottomLeft == other.bottomLeft;
+  }
+
+  @override
+  int get hashCode => Object.hash(topLeft, topRight, bottomRight, bottomLeft);
+
+  @override
+  String toString() {
+    return 'DisplayCornerRadii(topLeft: $topLeft, topRight: $topRight, '
+        'bottomRight: $bottomRight, bottomLeft: $bottomLeft)';
+  }
+}
 
 class Locale {
   const Locale(this._languageCode, [this._countryCode])
@@ -202,4 +594,70 @@ class Locale {
     }
     return out.toString();
   }
+}
+
+enum DartPerformanceMode { balanced, latency, throughput, memory }
+
+class SemanticsActionEvent {
+  const SemanticsActionEvent({
+    required this.type,
+    required this.viewId,
+    required this.nodeId,
+    this.arguments,
+  });
+
+  final SemanticsAction type;
+  final int viewId;
+  final int nodeId;
+  final Object? arguments;
+
+  static const Object _noArgumentPlaceholder = Object();
+
+  SemanticsActionEvent copyWith({
+    SemanticsAction? type,
+    int? viewId,
+    int? nodeId,
+    Object? arguments = _noArgumentPlaceholder,
+  }) {
+    return SemanticsActionEvent(
+      type: type ?? this.type,
+      viewId: viewId ?? this.viewId,
+      nodeId: nodeId ?? this.nodeId,
+      arguments: arguments == _noArgumentPlaceholder ? this.arguments : arguments,
+    );
+  }
+
+  @override
+  String toString() => 'SemanticsActionEvent($type, view: $viewId, node: $nodeId)';
+}
+
+final class ViewFocusEvent {
+  const ViewFocusEvent({required this.viewId, required this.state, required this.direction});
+
+  final int viewId;
+
+  final ViewFocusState state;
+
+  final ViewFocusDirection direction;
+
+  @override
+  String toString() {
+    return 'ViewFocusEvent(viewId: $viewId, state: $state, direction: $direction)';
+  }
+}
+
+enum ViewFocusState { unfocused, focused }
+
+enum ViewFocusDirection { undefined, forward, backward }
+
+class HitTestRequest {
+  const HitTestRequest({required this.view, required this.offset});
+  final FlutterView view;
+  final Offset offset;
+}
+
+class HitTestResponse {
+  const HitTestResponse({required this.hasPlatformView});
+  static const HitTestResponse empty = HitTestResponse(hasPlatformView: false);
+  final bool hasPlatformView;
 }

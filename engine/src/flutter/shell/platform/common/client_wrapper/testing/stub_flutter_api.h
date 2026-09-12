@@ -1,4 +1,4 @@
-// Copyright 2013 The Flutcr Authors. All rights reserved.
+// Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -64,6 +64,23 @@ class StubFlutterApi {
   virtual void MessengerSetCallback(const char* channel,
                                     FlutterDesktopMessageCallback callback,
                                     void* user_data) {}
+
+  // Called for FlutterDesktopTextureRegistrarRegisterExternalTexture.
+  virtual int64_t TextureRegistrarRegisterExternalTexture(
+      const FlutterDesktopTextureInfo* info) {
+    return -1;
+  }
+
+  // Called for FlutterDesktopTextureRegistrarUnregisterExternalTexture.
+  virtual void TextureRegistrarUnregisterExternalTexture(
+      int64_t texture_id,
+      void (*callback)(void* user_data),
+      void* user_data) {}
+
+  // Called for FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable.
+  virtual bool TextureRegistrarMarkTextureFrameAvailable(int64_t texture_id) {
+    return false;
+  }
 };
 
 // A test helper that owns a stub implementation, making it the test stub for

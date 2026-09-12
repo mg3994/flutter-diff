@@ -17,9 +17,12 @@ import java.util.Map;
  * <p>The ID of a given {@link io.flutter.embedding.engine.FlutterEngineGroup} can be whatever
  * {@code String} is desired.
  *
- * Use the {@code FlutterEngineGroupCache} singleton
+ * <p>{@link io.flutter.embedding.android.FlutterActivity} and {@link
+ * io.flutter.embedding.android.FlutterFragment} use the {@code FlutterEngineGroupCache} singleton
  * internally when instructed to use a cached {@link io.flutter.embedding.engine.FlutterEngineGroup}
- * based on a given ID.
+ * based on a given ID. See {@link
+ * io.flutter.embedding.android.FlutterActivity.NewEngineInGroupIntentBuilder} and {@link
+ * io.flutter.embedding.android.FlutterFragment#withNewEngineInGroup(String)} for related APIs.
  */
 public class FlutterEngineGroupCache {
   private static volatile FlutterEngineGroupCache instance;

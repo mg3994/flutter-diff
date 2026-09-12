@@ -63,12 +63,6 @@ enum CanvasKitVariant {
   /// WARNING: In most cases, you should use [auto] instead of this variant. Using
   /// this variant in a non-Chromium browser will result in a broken app.
   chromium,
-
-  /// The variant that contains the new WebParagraph implementation on top of Chrome's Text Clusters
-  /// API: https://github.com/fserb/canvas2D/blob/master/spec/enhanced-textmetrics.md
-  ///
-  /// WARNING: This is an experimental variant that's not yet ready for production use.
-  experimentalWebParagraph,
 }
 
 /// The Web Engine configuration for the current application.
@@ -134,6 +128,13 @@ class FlutterConfiguration {
           'See: https://docs.flutter.dev/development/platform-integration/web/initialization',
         );
       }
+      if (_requestedRendererType != null) {
+        domWindow.console.warn(
+          'window.flutterWebRenderer is now deprecated.\n'
+          'Use engineInitializer.initializeEngine(config) instead.\n'
+          'See: https://docs.flutter.dev/development/platform-integration/web/initialization',
+        );
+      }
       return true;
     }());
   }
@@ -170,7 +171,12 @@ class FlutterConfiguration {
         'Using the (deprecated) window.flutterConfiguration and initializeEngine '
         'configuration simultaneously is not supported.',
       );
-
+      assert(
+        _requestedRendererType == null || configuration.renderer == null,
+        'Use engineInitializer.initializeEngine(config) only. '
+        'Using the (deprecated) window.flutterWebRenderer and initializeEngine '
+        'configuration simultaneously is not supported.',
+      );
       _configuration = configuration;
     }
   }
@@ -181,14 +187,18 @@ class FlutterConfiguration {
   // runtime. They must be static constants for the compiler to remove dead code
   // effectively.
 
+  /// Whether to use the Skwasm rendering backend.
+  ///
+  /// If this is `false`, the engine will use the CanvasKit rendering backend.
+  ///
+  /// Using flutter tools option "--web-renderer=skwasm" sets this to `true`.
   static const bool flutterWebUseSkwasm = bool.fromEnvironment('FLUTTER_WEB_USE_SKWASM');
 
-  /// Enable the Skia-based rendering backend.
+  /// Whether to use the CanvasKit rendering backend.
   ///
-  /// Using flutter tools option "--web-renderer=canvaskit" would set the value to
-  /// true.
+  /// If this is `false`, the engine will use the Skwasm rendering backend.
   ///
-  /// Using flutter tools option "--web-renderer=html" would set the value to false.
+  /// Using flutter tools option "--web-renderer=canvaskit" sets this to `true`.
   static const bool useSkia = bool.fromEnvironment('FLUTTER_WEB_USE_SKIA');
 
   // Runtime parameters.
@@ -223,10 +233,145 @@ class FlutterConfiguration {
   /// Do not confuse this configuration value with [canvasKitBaseUrl].
   String? get assetBase => _configuration?.assetBase;
 
+  /// The base URL to use when downloading the CanvasKit script and associated
+  /// wasm.
+  ///
+  /// The expected directory structure nested under this URL is as follows:
+  ///
+  ///     /canvaskit.js              - the build of CanvasKit JS API bindings
+  ///     /canvaskit.wasm            - the build of CanvasKit WASM module
+  ///
+  /// The base URL can be overridden using the `FLUTTER_WEB_CANVASKIT_URL`
+  /// environment variable or using the configuration API for JavaScript.
+  ///
+  /// When specifying using the environment variable set it in the Flutter tool
+  /// using the `--dart-define` option. The value must end with a `/`.
+  ///
+  /// Example:
+  ///
+  /// ```bash
+  /// flutter run \
+  ///   -d chrome \
+  ///   --web-renderer=canvaskit \
+  ///   --dart-define=FLUTTER_WEB_CANVASKIT_URL=https://example.com/custom-canvaskit-build/
+  /// ```
+  String get canvasKitBaseUrl => _configuration?.canvasKitBaseUrl ?? _defaultCanvasKitBaseUrl;
+  static const String _defaultCanvasKitBaseUrl = String.fromEnvironment(
+    'FLUTTER_WEB_CANVASKIT_URL',
+    defaultValue: 'canvaskit/',
+  );
+
+  /// The variant of CanvasKit to download.
+  ///
+  /// Available values are:
+  ///
+  /// * `auto` - the default value. The engine will automatically detect the
+  /// best variant to use based on the browser.
+  ///
+  /// * `full` - the full variant of CanvasKit that can be used in any browser.
+  ///
+  /// * `chromium` - the lite variant of CanvasKit that can be used in
+  /// Chromium-based browsers.
+  CanvasKitVariant get canvasKitVariant {
+    final String variant = _configuration?.canvasKitVariant ?? 'auto';
+    return CanvasKitVariant.values.byName(variant);
+  }
+
+  /// If set to true, forces CPU-only rendering in CanvasKit (i.e. the engine
+  /// won't use WebGL).
+  ///
+  /// This is mainly used for testing or for apps that want to ensure they
+  /// run on devices which don't support WebGL.
+  bool get canvasKitForceCpuOnly =>
+      _configuration?.canvasKitForceCpuOnly ?? _defaultCanvasKitForceCpuOnly;
+  static const bool _defaultCanvasKitForceCpuOnly = bool.fromEnvironment(
+    'FLUTTER_WEB_CANVASKIT_FORCE_CPU_ONLY',
+  );
+
+  bool get canvasKitForceMultiSurfaceRasterizer =>
+      _configuration?.canvasKitForceMultiSurfaceRasterizer ??
+      _defaultCanvasKitForceMultiSurfaceRasterizer;
+  static const bool _defaultCanvasKitForceMultiSurfaceRasterizer = bool.fromEnvironment(
+    'FLUTTER_WEB_CANVASKIT_FORCE_MULTI_SURFACE_RASTERIZER',
+  );
+
+  /// The maximum number of canvases to use when rendering in CanvasKit.
+  ///
+  /// Limits the amount of overlays that can be created.
+  int get canvasKitMaximumSurfaces {
+    final int maxSurfaces = _configuration?.canvasKitMaximumSurfaces?.toInt() ?? 8;
+    if (maxSurfaces < 1) {
+      return 1;
+    }
+    return maxSurfaces;
+  }
+
+  /// Enables the new WebParagraph implementation built on top of Chrome's Text Clusters
+  /// API: https://github.com/fserb/canvas2D/blob/master/spec/enhanced-textmetrics.md
+  ///
+  /// If the browser doesn't support WebParagraph, this flag will have no effect.
+  ///
+  /// WARNING: This is an experimental feature.
+  bool get preferWebParagraph => _configuration?.preferWebParagraph ?? false;
+
+  /// Set this flag to `true` to cause the engine to visualize the semantics tree
+  /// on the screen for debugging.
+  ///
+  /// This only works in profile and release modes. Debug mode does not support
+  /// passing compile-time constants.
+  ///
+  /// Example:
+  ///
+  /// ```bash
+  /// flutter run -d chrome --profile --dart-define=FLUTTER_WEB_DEBUG_SHOW_SEMANTICS=true
+  /// ```
+  bool get debugShowSemanticsNodes =>
+      _configuration?.debugShowSemanticsNodes ?? _defaultDebugShowSemanticsNodes;
+  static const bool _defaultDebugShowSemanticsNodes = bool.fromEnvironment(
+    'FLUTTER_WEB_DEBUG_SHOW_SEMANTICS',
+  );
+
+  /// Returns the [hostElement] in which the Flutter Application is supposed
+  /// to render, or `null` if the user hasn't specified anything.
+  DomElement? get hostElement => _configuration?.hostElement;
+
+  /// Sets Flutter Web in "multi-view" mode.
+  ///
+  /// Multi-view mode allows apps to:
+  ///
+  ///  * Start without a `hostElement`.
+  ///  * Add/remove views (`hostElements`) from JS while the application is running.
+  ///  * ...
+  ///  * PROFIT?
+  bool get multiViewEnabled => _configuration?.multiViewEnabled ?? false;
+
   /// Returns a `nonce` to allowlist the inline styles that Flutter web needs.
   ///
   /// See: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/nonce
   String? get nonce => _configuration?.nonce;
+
+  /// Returns the [requestedRendererType] to be used with the current Flutter
+  /// application, normally 'canvaskit' or 'auto'.
+  ///
+  /// This value may come from the JS configuration, but also a specific JS value:
+  /// `window.flutterWebRenderer`.
+  ///
+  /// This is used by the Renderer class to decide how to initialize the engine.
+  String? get requestedRendererType => _configuration?.renderer ?? _requestedRendererType;
+
+  /// Returns the base URL to load fallback fonts from. Fallback fonts are
+  /// downloaded automatically when there is no font bundled with the app that
+  /// can show a glyph that is being rendered.
+  ///
+  /// Defaults to 'https://fonts.gstatic.com/s/'.
+  String get fontFallbackBaseUrl =>
+      _configuration?.fontFallbackBaseUrl ?? 'https://fonts.gstatic.com/s/';
+
+  /// If set to true, the engine will skip the 1 second delay between font
+  /// download retries.
+  ///
+  /// This is used for testing.
+  bool get debugSkipFontRetryDelay => _configuration?.debugSkipFontRetryDelay ?? false;
 
   bool get forceSingleThreadedSkwasm => _configuration?.forceSingleThreadedSkwasm ?? false;
 }
@@ -238,11 +383,39 @@ external JsFlutterConfiguration? get _jsConfiguration;
 extension type JsFlutterConfiguration._(JSObject _) implements JSObject {
   external JsFlutterConfiguration({
     String? assetBase,
+    String? canvasKitBaseUrl,
+    String? canvasKitVariant,
+    bool? canvasKitForceCpuOnly,
+    bool? canvasKitForceMultiSurfaceRasterizer,
+    double? canvasKitMaximumSurfaces,
+    bool? debugShowSemanticsNodes,
+    DomElement? hostElement,
+    bool? multiViewEnabled,
     String? nonce,
+    String? renderer,
+    String? fontFallbackBaseUrl,
+    bool? debugSkipFontRetryDelay,
     bool? forceSingleThreadedSkwasm,
   });
 
   external String? get assetBase;
+  external String? get canvasKitBaseUrl;
+  external String? get canvasKitVariant;
+  external bool? get canvasKitForceCpuOnly;
+  external bool? get canvasKitForceMultiSurfaceRasterizer;
+  external double? get canvasKitMaximumSurfaces;
+  external bool? get preferWebParagraph;
+  external bool? get debugShowSemanticsNodes;
+  external DomElement? get hostElement;
+  external bool? get multiViewEnabled;
   external String? get nonce;
+  external String? get renderer;
+  external String? get fontFallbackBaseUrl;
+  external bool? get debugSkipFontRetryDelay;
   external bool? get forceSingleThreadedSkwasm;
 }
+
+/// A JavaScript entrypoint that allows developer to set rendering backend
+/// at runtime before launching the application.
+@JS('window.flutterWebRenderer')
+external String? get _requestedRendererType;

@@ -18,7 +18,13 @@ import java.util.Map;
  * String} is desired.
  *
  * <p>{@code FlutterEngineCache} is useful for storing pre-warmed {@link
- * io.flutter.embedding.engine.FlutterEngine} instances.
+ * io.flutter.embedding.engine.FlutterEngine} instances. {@link
+ * io.flutter.embedding.android.FlutterActivity} and {@link
+ * io.flutter.embedding.android.FlutterFragment} use the {@code FlutterEngineCache} singleton
+ * internally when instructed to use a cached {@link io.flutter.embedding.engine.FlutterEngine}
+ * based on a given ID. See {@link
+ * io.flutter.embedding.android.FlutterActivity.CachedEngineIntentBuilder} and {@link
+ * io.flutter.embedding.android.FlutterFragment#withCachedEngine(String)} for related APIs.
  */
 public class FlutterEngineCache {
   private static FlutterEngineCache instance;

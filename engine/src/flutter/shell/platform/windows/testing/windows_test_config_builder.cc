@@ -30,12 +30,27 @@ void WindowsConfigBuilder::SetDartEntrypoint(std::string_view entrypoint) {
   dart_entrypoint_ = entrypoint;
 }
 
+void WindowsConfigBuilder::SetUIThreadPolicy(
+    FlutterDesktopUIThreadPolicy policy) {
+  ui_thread_policy_ = policy;
+}
+
 void WindowsConfigBuilder::AddDartEntrypointArgument(std::string_view arg) {
   if (arg.empty()) {
     return;
   }
 
   dart_entrypoint_arguments_.emplace_back(std::move(arg));
+}
+
+void WindowsConfigBuilder::SetGpuPreference(
+    FlutterDesktopGpuPreference gpu_preference) {
+  gpu_preference_ = gpu_preference;
+}
+
+void WindowsConfigBuilder::SetAccessibilityMode(
+    FlutterDesktopAccessibilityMode accessibility_mode) {
+  accessibility_mode_ = accessibility_mode;
 }
 
 FlutterDesktopEngineProperties WindowsConfigBuilder::GetEngineProperties()
@@ -62,6 +77,10 @@ FlutterDesktopEngineProperties WindowsConfigBuilder::GetEngineProperties()
     engine_properties.dart_entrypoint_argv = nullptr;
     engine_properties.dart_entrypoint_argc = 0;
   }
+
+  engine_properties.gpu_preference = gpu_preference_;
+  engine_properties.ui_thread_policy = ui_thread_policy_;
+  engine_properties.accessibility_mode = accessibility_mode_;
 
   return engine_properties;
 }
@@ -90,6 +109,33 @@ EnginePtr WindowsConfigBuilder::RunHeadless() const {
   }
 
   return engine;
+}
+
+ViewControllerPtr WindowsConfigBuilder::Run() const {
+  InitializeCOM();
+
+  EnginePtr engine = InitializeEngine();
+  if (!engine) {
+    return {};
+  }
+
+  // Register native functions.
+  FlutterWindowsEngine* windows_engine =
+      reinterpret_cast<FlutterWindowsEngine*>(engine.get());
+  windows_engine->SetRootIsolateCreateCallback(
+      context_.GetRootIsolateCallback());
+
+  int width = 600;
+  int height = 400;
+
+  // Create a view controller that owns the engine.
+  ViewControllerPtr controller{
+      FlutterDesktopViewControllerCreate(width, height, engine.release())};
+  if (!controller) {
+    return {};
+  }
+
+  return controller;
 }
 
 void WindowsConfigBuilder::InitializeCOM() const {

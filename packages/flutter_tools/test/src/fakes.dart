@@ -686,9 +686,6 @@ class FakeOperatingSystemUtils extends Fake implements OperatingSystemUtils {
   void makeExecutable(File file) {}
 
   @override
-  HostPlatform? hostPlatformOverride;
-
-  @override
   HostPlatform hostPlatform = HostPlatform.linux_x64;
 
   @override

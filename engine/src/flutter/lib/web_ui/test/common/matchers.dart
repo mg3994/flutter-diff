@@ -50,6 +50,7 @@ typedef DistanceFunction<T> = double Function(T a, T b);
 typedef AnyDistanceFunction = double Function(Never a, Never b);
 
 const Map<Type, AnyDistanceFunction> _kStandardDistanceFunctions = <Type, AnyDistanceFunction>{
+  Color: _maxComponentColorDistance,
   Offset: _offsetDistance,
   int: _intDistance,
   double: _doubleDistance,
@@ -60,6 +61,13 @@ const Map<Type, AnyDistanceFunction> _kStandardDistanceFunctions = <Type, AnyDis
 double _intDistance(int a, int b) => (b - a).abs().toDouble();
 double _doubleDistance(double a, double b) => (b - a).abs();
 double _offsetDistance(Offset a, Offset b) => (b - a).distance;
+
+double _maxComponentColorDistance(Color a, Color b) {
+  int delta = math.max<int>((a.red - b.red).abs(), (a.green - b.green).abs());
+  delta = math.max<int>(delta, (a.blue - b.blue).abs());
+  delta = math.max<int>(delta, (a.alpha - b.alpha).abs());
+  return delta.toDouble();
+}
 
 double _rectDistance(Rect a, Rect b) {
   double delta = math.max<double>((a.left - b.left).abs(), (a.top - b.top).abs());
@@ -249,7 +257,7 @@ class HtmlPatternMatcher extends Matcher {
   final html.Element pattern;
 
   @override
-  bool matches(final Object? object, Map<Object?, Object?> matchState) {
+  bool matches(Object? object, Map<Object?, Object?> matchState) {
     // TODO(srujzs): Replace this with `!object.isJSAny` once we have that API
     // in `dart:js_interop`.
     // https://github.com/dart-lang/sdk/issues/56905

@@ -14,6 +14,7 @@ _public_headers = [
   "public/flutter_macros.h",
   "public/flutter_messenger.h",
   "public/flutter_plugin_registrar.h",
+  "public/flutter_texture_registrar.h",
 ]
 
 # Any files that are built by clients (client_wrapper code, library headers for
@@ -37,6 +38,25 @@ copy("publish_headers") {
   outputs = [ "$root_out_dir/{{source_file_part}}" ]
 }
 
+source_set("common_cpp_input") {
+  public = [
+    "text_editing_delta.h",
+    "text_input_model.h",
+    "text_range.h",
+  ]
+
+  sources = [
+    "text_editing_delta.cc",
+    "text_input_model.cc",
+  ]
+
+  configs += [ ":desktop_library_implementation" ]
+
+  public_configs = [ "//flutter:config" ]
+
+  deps = [ "//flutter/fml" ]
+}
+
 source_set("common_cpp_isolate_scope") {
   public = [ "isolate_scope.h" ]
   sources = [ "isolate_scope.cc" ]
@@ -44,6 +64,18 @@ source_set("common_cpp_isolate_scope") {
   deps = [
     "$dart_src/runtime:dart_api",
     "//flutter/fml",
+  ]
+}
+
+source_set("common_cpp_enums") {
+  public = [
+    "app_lifecycle_state.h",
+    "platform_provided_menu.h",
+  ]
+
+  public_configs = [
+    "//flutter:config",
+    "//flutter/common:flutter_config",
   ]
 }
 
@@ -55,6 +87,29 @@ source_set("common_cpp_switches") {
   public_configs = [
     "//flutter:config",
     "//flutter/common:flutter_config",
+  ]
+}
+
+source_set("common_cpp_accessibility") {
+  public = [
+    "accessibility_bridge.h",
+    "alert_platform_node_delegate.h",
+    "flutter_platform_node_delegate.h",
+  ]
+
+  sources = [
+    "accessibility_bridge.cc",
+    "alert_platform_node_delegate.cc",
+    "flutter_platform_node_delegate.cc",
+  ]
+
+  public_configs =
+      [ "//flutter/third_party/accessibility:accessibility_config" ]
+
+  public_deps = [
+    "//flutter/fml",
+    "//flutter/shell/platform/embedder:embedder_as_internal_library",
+    "//flutter/third_party/accessibility",
   ]
 }
 
@@ -96,6 +151,7 @@ source_set("common_cpp") {
 source_set("common_cpp_core") {
   public = [
     "path_utils.h",
+    "windowing.h",
   ]
 
   sources = [ "path_utils.cc" ]
@@ -140,17 +196,33 @@ if (enable_unittests) {
       "incoming_message_dispatcher_unittests.cc",
       "json_message_codec_unittests.cc",
       "json_method_codec_unittests.cc",
+      "text_editing_delta_unittests.cc",
+      "text_input_model_unittests.cc",
+      "text_range_unittests.cc",
     ]
 
     deps = [
       ":common_cpp",
       ":common_cpp_fixtures",
+      ":common_cpp_input",
       ":common_cpp_switches",
       "//flutter/fml:string_conversion",
       "//flutter/shell/platform/common/client_wrapper",
       "//flutter/shell/platform/common/client_wrapper:client_wrapper_library_stubs",
       "//flutter/testing",
     ]
+
+    # The accessibility bridge only supports MacOS for now.
+    if (is_mac || is_win) {
+      sources += [
+        "accessibility_bridge_unittests.cc",
+        "flutter_platform_node_delegate_unittests.cc",
+        "test_accessibility_bridge.cc",
+        "test_accessibility_bridge.h",
+      ]
+
+      deps += [ ":common_cpp_accessibility" ]
+    }
 
     public_configs = [ "//flutter:config" ]
   }

@@ -55,7 +55,13 @@ static void InitDartInternal(Dart_Handle builtin_library, bool is_ui_isolate) {
       Dart_SetField(internal_library, ToDart("_printClosure"), print);
   PropagateIfError(result);
 
-  // Call |_setupHooks| to configure |VMLibraryHooks|.
+  if (is_ui_isolate) {
+    // Call |_setupHooks| to configure |VMLibraryHooks|.
+    Dart_Handle method_name = Dart_NewStringFromCString("_setupHooks");
+    result = Dart_Invoke(builtin_library, method_name, 0, NULL);
+    PropagateIfError(result);
+  }
+
   Dart_Handle setup_hooks = Dart_NewStringFromCString("_setupHooks");
 
   Dart_Handle isolate_lib = Dart_LookupLibrary(ToDart("dart:isolate"));

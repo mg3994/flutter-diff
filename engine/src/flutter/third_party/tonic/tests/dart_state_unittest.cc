@@ -24,6 +24,8 @@ TEST_F(DartState, CurrentWithNullDataDoesNotSegfault) {
   ASSERT_TRUE(vm_data);
   TaskRunners task_runners(GetCurrentTestName(),    //
                            GetCurrentTaskRunner(),  //
+                           GetCurrentTaskRunner(),  //
+                           GetCurrentTaskRunner(),  //
                            GetCurrentTaskRunner()   //
   );
   auto isolate_configuration =
@@ -55,6 +57,8 @@ TEST_F(DartState, IsShuttingDown) {
   auto vm_data = vm_ref.GetVMData();
   ASSERT_TRUE(vm_data);
   TaskRunners task_runners(GetCurrentTestName(),    //
+                           GetCurrentTaskRunner(),  //
+                           GetCurrentTaskRunner(),  //
                            GetCurrentTaskRunner(),  //
                            GetCurrentTaskRunner()   //
   );

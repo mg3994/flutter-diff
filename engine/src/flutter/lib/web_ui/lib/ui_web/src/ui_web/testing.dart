@@ -5,6 +5,20 @@
 import 'package:ui/src/engine.dart';
 import 'package:ui/ui.dart' as ui;
 
+extension SingletonFlutterWindowExtension on ui.SingletonFlutterWindow {
+  /// Overrides the value of [physicalSize] in tests.
+  set debugPhysicalSizeOverride(ui.Size? value) {
+    (this as EngineFlutterWindow).debugPhysicalSizeOverride = value;
+  }
+}
+
+/// Overrides the value of [ui.FlutterView.devicePixelRatio] in tests.
+///
+/// Passing `null` resets the device pixel ratio to the browser's default.
+void debugOverrideDevicePixelRatio(double? value) {
+  EngineFlutterDisplay.instance.debugOverrideDevicePixelRatio(value);
+}
+
 final class TestEnvironment {
   const TestEnvironment({
     this.ignorePlatformMessages = false,

@@ -9,6 +9,7 @@
 
 #include "flutter/fml/macros.h"
 #include "flutter/lib/ui/dart_wrapper.h"
+#include "third_party/skia/include/core/SkData.h"
 #include "third_party/tonic/dart_library_natives.h"
 #include "third_party/tonic/logging/dart_invoke.h"
 #include "third_party/tonic/typed_data/typed_list.h"
@@ -75,10 +76,8 @@ class ImmutableBuffer : public RefCountedDartWrappable<ImmutableBuffer> {
     return data_->size();
   }
 
-  using Data = std::vector<uint8_t>;
-
   /// Callers should not modify the returned data. This is not exposed to Dart.
-  std::shared_ptr<Data> data() const { return data_; }
+  sk_sp<SkData> data() const { return data_; }
 
   /// Clears the Dart native fields and removes the reference to the underlying
   /// byte buffer.
@@ -91,13 +90,11 @@ class ImmutableBuffer : public RefCountedDartWrappable<ImmutableBuffer> {
   }
 
  private:
-  explicit ImmutableBuffer(std::shared_ptr<Data> data)
-      : data_(std::move(data)) {}
+  explicit ImmutableBuffer(sk_sp<SkData> data) : data_(std::move(data)) {}
 
-  std::shared_ptr<Data> data_;
+  sk_sp<SkData> data_;
 
-  static std::shared_ptr<Data> MakeDataWithCopy(const void* data,
-                                                size_t length);
+  static sk_sp<SkData> MakeSkDataWithCopy(const void* data, size_t length);
 
   DEFINE_WRAPPERTYPEINFO();
   FML_FRIEND_MAKE_REF_COUNTED(ImmutableBuffer);

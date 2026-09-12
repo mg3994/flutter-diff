@@ -29,6 +29,25 @@ extern const intptr_t kPlatformStrongDillSize;
 
 static const char* kApplicationKernelSnapshotFileName = "kernel_blob.bin";
 
+static BOOL DoesHardwareSupportWideGamut() {
+  static BOOL result = NO;
+  static dispatch_once_t once_token = 0;
+  dispatch_once(&once_token, ^{
+    id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+    result = [device supportsFamily:MTLGPUFamilyApple2];
+  });
+  return result;
+}
+
+NSNumber* _Nullable FLTEnableWideGamutFromBundle(NSBundle* _Nullable bundle,
+                                                 NSBundle* _Nullable mainBundle) {
+  NSNumber* nsEnableWideGamut = [bundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"];
+  if (nsEnableWideGamut == nil && bundle != mainBundle) {
+    nsEnableWideGamut = [mainBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"];
+  }
+  return nsEnableWideGamut;
+}
+
 flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* processInfoOrNil) {
   auto command_line = flutter::CommandLineFromNSProcessInfo(processInfoOrNil);
 
@@ -47,6 +66,10 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
   }
 
   auto settings = flutter::SettingsFromCommandLine(command_line, true);
+
+  FML_CHECK(settings.merged_platform_ui_thread !=
+            flutter::Settings::MergedPlatformUIThread::kMergeAfterLaunch)
+      << "merged-platform-ui-thread=mergeAfterLaunch is not supported on iOS.";
 
   settings.task_observer_add = [](intptr_t key, const fml::closure& callback) {
     fml::TaskQueueId queue_id = fml::MessageLoop::GetCurrentTaskQueueId();
@@ -67,6 +90,8 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
     std::string log = stream.str();
     [FlutterLogger logDirect:[NSString stringWithUTF8String:log.c_str()]];
   };
+
+  settings.enable_platform_isolates = true;
 
   // The command line arguments may not always be complete. If they aren't, attempt to fill in
   // defaults.
@@ -146,6 +171,25 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
   settings.may_insecurely_connect_to_all_domains = true;
   settings.domain_network_policy = "";
 
+  // Whether to enable wide gamut colors.
+#if TARGET_OS_SIMULATOR
+  // As of Xcode 14.1, the wide gamut surface pixel formats are not supported by
+  // the simulator.
+  settings.enable_wide_gamut = false;
+  // Removes unused function warning.
+  (void)DoesHardwareSupportWideGamut;
+#else
+  NSNumber* nsEnableWideGamut = FLTEnableWideGamutFromBundle(bundle, mainBundle);
+  BOOL enableWideGamut =
+      (nsEnableWideGamut ? nsEnableWideGamut.boolValue : YES) && DoesHardwareSupportWideGamut();
+  settings.enable_wide_gamut = enableWideGamut;
+#endif
+
+  settings.warn_on_impeller_opt_out = true;
+
+  NSNumber* nsEnableSDFs = [mainBundle objectForInfoDictionaryKey:@"FLTEnableSDFs"];
+  settings.impeller_use_sdfs = (nsEnableSDFs ? nsEnableSDFs.boolValue : NO);
+
   NSNumber* enableTraceSystrace = [mainBundle objectForInfoDictionaryKey:@"FLTTraceSystrace"];
   // Change the default only if the option is present.
   if (enableTraceSystrace != nil) {
@@ -189,6 +233,11 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
         << "FLTEnableMergedPlatformUIThread=false is no longer allowed.";
   }
 
+  NSNumber* enableFlutterGPU = [mainBundle objectForInfoDictionaryKey:@"FLTEnableFlutterGPU"];
+  if (enableFlutterGPU != nil) {
+    settings.enable_flutter_gpu = enableFlutterGPU.boolValue;
+  }
+
 #if FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG
   // There are no ownership concerns here as all mappings are owned by the
   // embedder and not the engine.
@@ -213,14 +262,18 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
 
   // This is the formula Android uses.
   // https://android.googlesource.com/platform/frameworks/base/+/39ae5bac216757bc201490f4c7b8c0f63006c6cd/libs/hwui/renderthread/CacheManager.cpp#45
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  UIScreen* mainScreen = [UIScreen mainScreen];
-#pragma clang diagnostic pop
-  CGFloat scale = mainScreen.scale;
-  CGFloat screenWidth = mainScreen.bounds.size.width * scale;
-  CGFloat screenHeight = mainScreen.bounds.size.height * scale;
+  CGFloat scale = [UIScreen mainScreen].scale;
+  CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width * scale;
+  CGFloat screenHeight = [UIScreen mainScreen].bounds.size.height * scale;
   settings.resource_cache_max_bytes_threshold = screenWidth * screenHeight * 12 * 4;
+
+  // Whether to enable ios embedder api.
+  NSNumber* enable_embedder_api =
+      [mainBundle objectForInfoDictionaryKey:@"FLTEnableIOSEmbedderAPI"];
+  // Change the default only if the option is present.
+  if (enable_embedder_api) {
+    settings.enable_embedder_api = enable_embedder_api.boolValue;
+  }
 
   return settings;
 }
@@ -373,6 +426,10 @@ flutter::Settings FLTDefaultSettingsForBundle(NSBundle* bundle, NSProcessInfo* p
 
 + (NSString*)defaultBundleIdentifier {
   return @"io.flutter.flutter.app";
+}
+
+- (BOOL)isWideGamutEnabled {
+  return _settings.enable_wide_gamut;
 }
 
 @end

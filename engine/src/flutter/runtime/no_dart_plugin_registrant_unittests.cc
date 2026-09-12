@@ -55,6 +55,8 @@ TEST_F(DartIsolateTest, DartPluginRegistrantIsNotPresent) {
   auto thread = CreateNewThread();
   TaskRunners task_runners(GetCurrentTestName(),  //
                            thread,                //
+                           thread,                //
+                           thread,                //
                            thread                 //
   );
 

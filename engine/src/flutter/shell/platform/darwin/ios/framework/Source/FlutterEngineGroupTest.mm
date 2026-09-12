@@ -6,7 +6,7 @@
 #import <XCTest/XCTest.h>
 
 #import "flutter/shell/platform/darwin/ios/framework/Headers/FlutterEngineGroup.h"
-#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine_Test.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine+Test.h"
 
 FLUTTER_ASSERT_ARC
 
@@ -28,10 +28,12 @@ FLUTTER_ASSERT_ARC
 - (void)testSpawn {
   FlutterEngineGroup* group = [[FlutterEngineGroup alloc] initWithName:@"foo" project:nil];
   FlutterEngine* spawner = [group makeEngineWithEntrypoint:nil libraryURI:nil];
+  spawner.isGpuDisabled = YES;
   FlutterEngine* spawnee = [group makeEngineWithEntrypoint:nil libraryURI:nil];
   XCTAssertNotNil(spawner);
   XCTAssertNotNil(spawnee);
   XCTAssertEqual(&spawner.threadHost, &spawnee.threadHost);
+  XCTAssertEqual(spawner.isGpuDisabled, spawnee.isGpuDisabled);
 }
 
 - (void)testDeleteLastEngine {

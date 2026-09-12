@@ -3,17 +3,22 @@
 // found in the LICENSE file.
 
 #include "flutter/shell/platform/embedder/embedder_engine.h"
-#include "flutter/fml/synchronization/waitable_event.h"
+
+#include "flutter/fml/make_copyable.h"
+#include "flutter/shell/platform/embedder/vsync_waiter_embedder.h"
 
 namespace flutter {
 
 struct ShellArgs {
   Settings settings;
   Shell::CreateCallback<PlatformView> on_create_platform_view;
+  Shell::CreateCallback<Rasterizer> on_create_rasterizer;
   ShellArgs(const Settings& p_settings,
-            Shell::CreateCallback<PlatformView> p_on_create_platform_view)
+            Shell::CreateCallback<PlatformView> p_on_create_platform_view,
+            Shell::CreateCallback<Rasterizer> p_on_create_rasterizer)
       : settings(p_settings),
-        on_create_platform_view(std::move(p_on_create_platform_view)) {}
+        on_create_platform_view(std::move(p_on_create_platform_view)),
+        on_create_rasterizer(std::move(p_on_create_rasterizer)) {}
 };
 
 EmbedderEngine::EmbedderEngine(
@@ -21,12 +26,16 @@ EmbedderEngine::EmbedderEngine(
     const flutter::TaskRunners& task_runners,
     const flutter::Settings& settings,
     RunConfiguration run_configuration,
-    const Shell::CreateCallback<PlatformView>& on_create_platform_view)
+    const Shell::CreateCallback<PlatformView>& on_create_platform_view,
+    const Shell::CreateCallback<Rasterizer>& on_create_rasterizer,
+    std::unique_ptr<EmbedderExternalTextureResolver> external_texture_resolver)
     : thread_host_(std::move(thread_host)),
       task_runners_(task_runners),
       run_configuration_(std::move(run_configuration)),
-      shell_args_(
-          std::make_unique<ShellArgs>(settings, on_create_platform_view)) {}
+      shell_args_(std::make_unique<ShellArgs>(settings,
+                                              on_create_platform_view,
+                                              on_create_rasterizer)),
+      external_texture_resolver_(std::move(external_texture_resolver)) {}
 
 EmbedderEngine::~EmbedderEngine() = default;
 
@@ -40,9 +49,9 @@ bool EmbedderEngine::LaunchShell() {
     FML_DLOG(ERROR) << "Shell already initialized";
   }
 
-  shell_ = Shell::Create(flutter::PlatformData(), task_runners_,
-                         shell_args_->settings,
-                         shell_args_->on_create_platform_view);
+  shell_ = Shell::Create(
+      flutter::PlatformData(), task_runners_, shell_args_->settings,
+      shell_args_->on_create_platform_view, shell_args_->on_create_rasterizer);
 
   // Reset the args no matter what. They will never be used to initialize a
   // shell again.
@@ -131,6 +140,36 @@ bool EmbedderEngine::NotifyDestroyed() {
   return true;
 }
 
+bool EmbedderEngine::SetViewportMetrics(
+    int64_t view_id,
+    const flutter::ViewportMetrics& metrics) {
+  if (!IsValid()) {
+    return false;
+  }
+
+  auto platform_view = shell_->GetPlatformView();
+  if (!platform_view) {
+    return false;
+  }
+  platform_view->SetViewportMetrics(view_id, metrics);
+  return true;
+}
+
+bool EmbedderEngine::DispatchPointerDataPacket(
+    std::unique_ptr<flutter::PointerDataPacket> packet) {
+  if (!IsValid() || !packet) {
+    return false;
+  }
+
+  auto platform_view = shell_->GetPlatformView();
+  if (!platform_view) {
+    return false;
+  }
+
+  platform_view->DispatchPointerDataPacket(std::move(packet));
+  return true;
+}
+
 bool EmbedderEngine::SendPlatformMessage(
     std::unique_ptr<PlatformMessage> message) {
   if (!IsValid() || !message) {
@@ -143,6 +182,100 @@ bool EmbedderEngine::SendPlatformMessage(
   }
 
   platform_view->DispatchPlatformMessage(std::move(message));
+  return true;
+}
+
+bool EmbedderEngine::RegisterTexture(int64_t texture) {
+  if (!IsValid()) {
+    return false;
+  }
+  shell_->GetPlatformView()->RegisterTexture(
+      external_texture_resolver_->ResolveExternalTexture(texture));
+  return true;
+}
+
+bool EmbedderEngine::UnregisterTexture(int64_t texture) {
+  if (!IsValid()) {
+    return false;
+  }
+  shell_->GetPlatformView()->UnregisterTexture(texture);
+  return true;
+}
+
+bool EmbedderEngine::MarkTextureFrameAvailable(int64_t texture) {
+  if (!IsValid()) {
+    return false;
+  }
+  shell_->GetPlatformView()->MarkTextureFrameAvailable(texture);
+  return true;
+}
+
+bool EmbedderEngine::SetSemanticsEnabled(bool enabled) {
+  if (!IsValid()) {
+    return false;
+  }
+
+  auto platform_view = shell_->GetPlatformView();
+  if (!platform_view) {
+    return false;
+  }
+  platform_view->SetSemanticsEnabled(enabled);
+  return true;
+}
+
+bool EmbedderEngine::SetAccessibilityFeatures(int32_t flags) {
+  if (!IsValid()) {
+    return false;
+  }
+  auto platform_view = shell_->GetPlatformView();
+  if (!platform_view) {
+    return false;
+  }
+  platform_view->SetAccessibilityFeatures(flags);
+  return true;
+}
+
+bool EmbedderEngine::DispatchSemanticsAction(int64_t view_id,
+                                             int node_id,
+                                             flutter::SemanticsAction action,
+                                             fml::MallocMapping args) {
+  if (!IsValid()) {
+    return false;
+  }
+  auto platform_view = shell_->GetPlatformView();
+  if (!platform_view) {
+    return false;
+  }
+  platform_view->DispatchSemanticsAction(view_id, node_id, action,
+                                         std::move(args));
+  return true;
+}
+
+bool EmbedderEngine::OnVsyncEvent(intptr_t baton,
+                                  fml::TimePoint frame_start_time,
+                                  fml::TimePoint frame_target_time) {
+  if (!IsValid()) {
+    return false;
+  }
+
+  return VsyncWaiterEmbedder::OnEmbedderVsync(
+      task_runners_, baton, frame_start_time, frame_target_time);
+}
+
+bool EmbedderEngine::ReloadSystemFonts() {
+  if (!IsValid()) {
+    return false;
+  }
+
+  return shell_->ReloadSystemFonts();
+}
+
+bool EmbedderEngine::PostRenderThreadTask(const fml::closure& task) {
+  if (!IsValid()) {
+    return false;
+  }
+
+  shell_->GetTaskRunners().GetRasterTaskRunner()->PostTask(task);
   return true;
 }
 
@@ -183,6 +316,9 @@ bool EmbedderEngine::PostTaskOnEngineManagedNativeThreads(
 
   // Post the task to all thread host threads.
   const auto& task_runners = shell_->GetTaskRunners();
+  trampoline(kFlutterNativeThreadTypeRender,
+             task_runners.GetRasterTaskRunner());
+  trampoline(kFlutterNativeThreadTypeWorker, task_runners.GetIOTaskRunner());
   trampoline(kFlutterNativeThreadTypeUI, task_runners.GetUITaskRunner());
   trampoline(kFlutterNativeThreadTypePlatform,
              task_runners.GetPlatformTaskRunner());
@@ -192,6 +328,19 @@ bool EmbedderEngine::PostTaskOnEngineManagedNativeThreads(
   vm->GetConcurrentMessageLoop()->PostTaskToAllWorkers(
       [closure]() { closure(kFlutterNativeThreadTypeWorker); });
 
+  return true;
+}
+
+bool EmbedderEngine::ScheduleFrame() {
+  if (!IsValid()) {
+    return false;
+  }
+
+  auto platform_view = shell_->GetPlatformView();
+  if (!platform_view) {
+    return false;
+  }
+  platform_view->ScheduleFrame();
   return true;
 }
 

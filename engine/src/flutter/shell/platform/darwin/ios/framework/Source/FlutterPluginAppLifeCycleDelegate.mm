@@ -200,8 +200,6 @@ static BOOL IsPowerOfTwo(NSUInteger x) {
  * For information about the possible keys in the NSDictionary and how to handle them, see
  * https://developer.apple.com/documentation/uikit/uiapplication/launchoptionskey
  */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static NSDictionary<UIApplicationLaunchOptionsKey, id>* ConvertConnectionOptions(
     UISceneConnectionOptions* connectionOptions) {
   NSMutableDictionary<UIApplicationLaunchOptionsKey, id>* convertedOptions =
@@ -220,7 +218,6 @@ static NSDictionary<UIApplicationLaunchOptionsKey, id>* ConvertConnectionOptions
   }
   return convertedOptions;
 }
-#pragma clang diagnostic pop
 
 - (BOOL)application:(UIApplication*)application
     willFinishLaunchingWithOptions:(NSDictionary*)launchOptions {
@@ -536,8 +533,6 @@ static NSDictionary<UIApplicationLaunchOptionsKey, id>* ConvertConnectionOptions
  * For information about the possible keys in the NSDictionary and how to handle them, see
  * https://developer.apple.com/documentation/uikit/uiapplication/openurloptionskey
  */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 static NSDictionary<UIApplicationOpenURLOptionsKey, id>* ConvertOptions(
     UISceneOpenURLOptions* options) {
   NSMutableDictionary<UIApplicationOpenURLOptionsKey, id>* convertedOptions =
@@ -554,7 +549,6 @@ static NSDictionary<UIApplicationOpenURLOptionsKey, id>* ConvertOptions(
   }
   return convertedOptions;
 }
-#pragma clang diagnostic pop
 
 - (BOOL)application:(UIApplication*)application handleOpenURL:(NSURL*)url {
   for (NSObject<FlutterApplicationLifeCycleDelegate>* delegate in _delegates.allObjects) {

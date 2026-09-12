@@ -6,6 +6,9 @@ import 'configuration.dart';
 import 'js_interop/js_app.dart';
 import 'js_interop/js_loader.dart';
 
+import 'platform_dispatcher.dart';
+import 'view_embedder/flutter_view_manager.dart';
+
 /// The type of a function that initializes an engine (in Dart).
 typedef InitEngineFn = Future<void> Function([JsFlutterConfiguration? params]);
 
@@ -63,13 +66,19 @@ class AppBootstrap {
     );
   }
 
+  FlutterViewManager get viewManager => EnginePlatformDispatcher.instance.viewManager;
+
   /// Represents the App that was just started, and its JS API.
   FlutterApp _prepareFlutterApp() {
     return FlutterApp(
-      addView: () {
-        return 0;
+      addView: (JsFlutterViewOptions options) {
+        assert(configuration.multiViewEnabled, 'Cannot addView when multiView is not enabled');
+        return viewManager.createAndRegisterView(options).viewId;
       },
-      removeView: (int id) {},
+      removeView: (int viewId) {
+        assert(configuration.multiViewEnabled, 'Cannot removeView when multiView is not enabled');
+        return viewManager.disposeAndUnregisterView(viewId);
+      },
     );
   }
 }

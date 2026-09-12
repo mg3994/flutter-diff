@@ -119,3 +119,43 @@ FlutterDesktopMessengerRef FlutterDesktopMessengerLock(
 void FlutterDesktopMessengerUnlock(FlutterDesktopMessengerRef messenger) {
   assert(false);  // not implemented
 }
+
+FlutterDesktopTextureRegistrarRef FlutterDesktopRegistrarGetTextureRegistrar(
+    FlutterDesktopPluginRegistrarRef registrar) {
+  return reinterpret_cast<FlutterDesktopTextureRegistrarRef>(1);
+}
+
+int64_t FlutterDesktopTextureRegistrarRegisterExternalTexture(
+    FlutterDesktopTextureRegistrarRef texture_registrar,
+    const FlutterDesktopTextureInfo* info) {
+  uint64_t result = -1;
+  if (s_stub_implementation) {
+    result =
+        s_stub_implementation->TextureRegistrarRegisterExternalTexture(info);
+  }
+  return result;
+}
+
+void FlutterDesktopTextureRegistrarUnregisterExternalTexture(
+    FlutterDesktopTextureRegistrarRef texture_registrar,
+    int64_t texture_id,
+    void (*callback)(void* user_data),
+    void* user_data) {
+  if (s_stub_implementation) {
+    s_stub_implementation->TextureRegistrarUnregisterExternalTexture(
+        texture_id, callback, user_data);
+  } else if (callback) {
+    callback(user_data);
+  }
+}
+
+bool FlutterDesktopTextureRegistrarMarkExternalTextureFrameAvailable(
+    FlutterDesktopTextureRegistrarRef texture_registrar,
+    int64_t texture_id) {
+  bool result = false;
+  if (s_stub_implementation) {
+    result = s_stub_implementation->TextureRegistrarMarkTextureFrameAvailable(
+        texture_id);
+  }
+  return result;
+}

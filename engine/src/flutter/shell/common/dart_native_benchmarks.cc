@@ -35,20 +35,21 @@ BENCHMARK_F(DartNativeBenchmarks, TimeToFirstNativeMessageFromIsolateInNewVM)
     fml::AutoResetWaitableEvent latch;
     st.PauseTiming();
     ASSERT_FALSE(DartVMRef::IsInstanceRunning());
-    AddNativeCallback("NotifyNative",
-                      CREATE_NATIVE_ENTRY(([&latch](Dart_NativeArguments args) {
-                        latch.Signal();
-                      })));
+    AddFfiNativeCallback("NotifyNative",
+                         CREATE_FFI_LAMBDA(([&latch]() { latch.Signal(); })));
 
     const auto settings = CreateSettingsForFixture();
     DartVMRef vm_ref = DartVMRef::Create(settings);
 
     ThreadHost thread_host("io.flutter.test.DartNativeBenchmarks.",
-                           ThreadHost::Type::kPlatform | ThreadHost::Type::kUi);
+                           ThreadHost::Type::kPlatform | ThreadHost::Type::kIo |
+                               ThreadHost::Type::kUi);
     TaskRunners task_runners(
         "test",
         thread_host.platform_thread->GetTaskRunner(),  // platform
-        thread_host.ui_thread->GetTaskRunner()         // io
+        thread_host.platform_thread->GetTaskRunner(),  // raster
+        thread_host.ui_thread->GetTaskRunner(),        // ui
+        thread_host.io_thread->GetTaskRunner()         // io
     );
 
     {
@@ -69,20 +70,21 @@ BENCHMARK_F(DartNativeBenchmarks, MultipleDartToNativeMessages)
     fml::CountDownLatch latch(1000);
     st.PauseTiming();
     ASSERT_FALSE(DartVMRef::IsInstanceRunning());
-    AddNativeCallback("NotifyNative",
-                      CREATE_NATIVE_ENTRY(([&latch](Dart_NativeArguments args) {
-                        latch.CountDown();
-                      })));
+    AddFfiNativeCallback(
+        "NotifyNative", CREATE_FFI_LAMBDA(([&latch]() { latch.CountDown(); })));
 
     const auto settings = CreateSettingsForFixture();
     DartVMRef vm_ref = DartVMRef::Create(settings);
 
     ThreadHost thread_host("io.flutter.test.DartNativeBenchmarks.",
-                           ThreadHost::Type::kPlatform | ThreadHost::Type::kUi);
+                           ThreadHost::Type::kPlatform | ThreadHost::Type::kIo |
+                               ThreadHost::Type::kUi);
     TaskRunners task_runners(
         "test",
         thread_host.platform_thread->GetTaskRunner(),  // platform
-        thread_host.ui_thread->GetTaskRunner()         // ui
+        thread_host.platform_thread->GetTaskRunner(),  // raster
+        thread_host.ui_thread->GetTaskRunner(),        // ui
+        thread_host.io_thread->GetTaskRunner()         // io
     );
 
     {

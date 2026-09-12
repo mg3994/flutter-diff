@@ -98,9 +98,9 @@ public class LocalizationChannel {
 
   /**
    * Handler that receives platform messages sent from Flutter to Android through a given {@link
-   * MethodChannel}.
+   * PlatformChannel}.
    *
-   * <p>To register a {@code LocalizationMessageHandler} with a {@link MethodChannel}, see {@link
+   * <p>To register a {@code LocalizationMessageHandler} with a {@link PlatformChannel}, see {@link
    * LocalizationChannel#setLocalizationMessageHandler(LocalizationMessageHandler)}.
    */
   public interface LocalizationMessageHandler {

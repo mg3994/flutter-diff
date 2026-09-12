@@ -6,6 +6,8 @@
 
 #include "flutter/shell/platform/embedder/embedder_thread_host.h"
 
+#include <algorithm>
+
 #include "flutter/fml/message_loop.h"
 #include "flutter/shell/platform/embedder/embedder_struct_macros.h"
 
@@ -143,6 +145,13 @@ EmbedderThreadHost::CreateEmbedderManagedThreadHost(
 
   auto thread_host_config = ThreadHost::ThreadHostConfig(config_setter);
 
+  // The IO threads are always created by the engine and the embedder has
+  // no opportunity to specify task runners for the same.
+  //
+  // If/when more task runners are exposed, this mask will need to be updated.
+  thread_host_config.SetIOConfig(MakeThreadConfig(
+      ThreadHost::Type::kIo, fml::Thread::ThreadPriority::kBackground));
+
   auto ui_task_runner_pair = CreateEmbedderTaskRunner(
       SAFE_ACCESS(custom_task_runners, ui_task_runner, nullptr));
   auto platform_task_runner_pair = CreateEmbedderTaskRunner(
@@ -161,6 +170,13 @@ EmbedderThreadHost::CreateEmbedderManagedThreadHost(
   if (!ui_task_runner_pair.second) {
     thread_host_config.SetUIConfig(MakeThreadConfig(
         ThreadHost::Type::kUi, fml::Thread::ThreadPriority::kDisplay));
+  }
+
+  // If the embedder has not supplied a raster task runner, one needs to be
+  // created.
+  if (!render_task_runner_pair.second) {
+    thread_host_config.SetRasterConfig(MakeThreadConfig(
+        ThreadHost::Type::kRaster, fml::Thread::ThreadPriority::kRaster));
   }
 
   // If both the platform task runner and the raster task runner are specified
@@ -192,14 +208,24 @@ EmbedderThreadHost::CreateEmbedderManagedThreadHost(
                                         platform_task_runner_pair.second)
                                   : GetCurrentThreadTaskRunner();
 
+  // If the embedder has supplied a raster task runner, use that. If not, use
+  // the one from our thread host.
+  auto render_task_runner = render_task_runner_pair.second
+                                ? static_cast<fml::RefPtr<fml::TaskRunner>>(
+                                      render_task_runner_pair.second)
+                                : thread_host.raster_thread->GetTaskRunner();
+
   auto ui_task_runner = ui_task_runner_pair.second
                             ? static_cast<fml::RefPtr<fml::TaskRunner>>(
                                   ui_task_runner_pair.second)
                             : thread_host.ui_thread->GetTaskRunner();
 
-  flutter::TaskRunners task_runners(kFlutterThreadName,
-                                    platform_task_runner,  // platform
-                                    ui_task_runner         // ui
+  flutter::TaskRunners task_runners(
+      kFlutterThreadName,
+      platform_task_runner,                   // platform
+      render_task_runner,                     // raster
+      ui_task_runner,                         // ui
+      thread_host.io_thread->GetTaskRunner()  // io (always engine managed)
   );
 
   if (!task_runners.IsValid()) {
@@ -240,6 +266,10 @@ EmbedderThreadHost::CreateEngineManagedThreadHost(
   auto thread_host_config = ThreadHost::ThreadHostConfig(config_setter);
   thread_host_config.SetUIConfig(MakeThreadConfig(
       flutter::ThreadHost::kUi, fml::Thread::ThreadPriority::kDisplay));
+  thread_host_config.SetRasterConfig(MakeThreadConfig(
+      flutter::ThreadHost::kRaster, fml::Thread::ThreadPriority::kRaster));
+  thread_host_config.SetIOConfig(MakeThreadConfig(
+      flutter::ThreadHost::kIo, fml::Thread::ThreadPriority::kBackground));
 
   // Create a thread host with the current thread as the platform thread and all
   // other threads managed.
@@ -252,8 +282,10 @@ EmbedderThreadHost::CreateEngineManagedThreadHost(
 
   flutter::TaskRunners task_runners(
       kFlutterThreadName,
-      platform_task_runner,                   // platform
-      thread_host.ui_thread->GetTaskRunner()  // ui
+      platform_task_runner,                        // platform
+      thread_host.raster_thread->GetTaskRunner(),  // raster
+      thread_host.ui_thread->GetTaskRunner(),      // ui
+      thread_host.io_thread->GetTaskRunner()       // io
   );
 
   if (!task_runners.IsValid()) {

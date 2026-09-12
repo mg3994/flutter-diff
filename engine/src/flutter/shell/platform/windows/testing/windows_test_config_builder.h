@@ -11,10 +11,8 @@
 
 #include "flutter/fml/macros.h"
 #include "flutter/fml/unique_object.h"
-#include "flutter/shell/platform/windows/flutter_windows_engine.h"
 #include "flutter/shell/platform/windows/public/flutter_windows.h"
 #include "flutter/shell/platform/windows/testing/windows_test_context.h"
-
 
 namespace flutter {
 namespace testing {
@@ -29,6 +27,18 @@ struct EngineDeleter {
 
 // Unique pointer wrapper for FlutterDesktopEngineRef.
 using EnginePtr = std::unique_ptr<FlutterDesktopEngine, EngineDeleter>;
+
+// Deleter for FlutterViewControllerRef objects.
+struct ViewControllerDeleter {
+  typedef FlutterDesktopViewControllerRef pointer;
+  void operator()(FlutterDesktopViewControllerRef controller) {
+    FlutterDesktopViewControllerDestroy(controller);
+  }
+};
+
+// Unique pointer wrapper for FlutterDesktopViewControllerRef.
+using ViewControllerPtr =
+    std::unique_ptr<FlutterDesktopViewController, ViewControllerDeleter>;
 
 // Test configuration builder for WindowsTests.
 //
@@ -48,8 +58,16 @@ class WindowsConfigBuilder {
   // must be decorated with `@pragma('vm:entry-point')`.
   void SetDartEntrypoint(std::string_view entrypoint);
 
+  // Set the UI Thread policy for the engine.
+  // If not set defaults to FlutterDesktopUIThreadPolicy::Default;
+  void SetUIThreadPolicy(FlutterDesktopUIThreadPolicy policy);
+
   // Adds an argument to the Dart entrypoint arguments List<String>.
   void AddDartEntrypointArgument(std::string_view arg);
+
+  void SetGpuPreference(FlutterDesktopGpuPreference gpu_preference);
+
+  void SetAccessibilityMode(FlutterDesktopAccessibilityMode accessibility_mode);
 
   // Returns a configured and initialized engine.
   EnginePtr InitializeEngine() const;
@@ -60,6 +78,12 @@ class WindowsConfigBuilder {
   // Returns null on failure.
   EnginePtr RunHeadless() const;
 
+  // Returns a configured and initialized view controller that runs the
+  // configured Dart entrypoint and owns its engine.
+  //
+  // Returns null on failure.
+  ViewControllerPtr Run() const;
+
  private:
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
@@ -68,6 +92,14 @@ class WindowsConfigBuilder {
   WindowsTestContext& context_;
   std::string dart_entrypoint_;
   std::vector<std::string> dart_entrypoint_arguments_;
+  FlutterDesktopUIThreadPolicy ui_thread_policy_ =
+      FlutterDesktopUIThreadPolicy::Default;
+
+  FlutterDesktopGpuPreference gpu_preference_ =
+      FlutterDesktopGpuPreference::NoPreference;
+
+  FlutterDesktopAccessibilityMode accessibility_mode_ =
+      FlutterDesktopAccessibilityMode::DefaultAccessibilityMode;
 
   FML_DISALLOW_COPY_AND_ASSIGN(WindowsConfigBuilder);
 };

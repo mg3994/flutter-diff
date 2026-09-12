@@ -11,6 +11,7 @@
 #include "flutter/shell/common/run_configuration.h"
 #include "flutter/shell/common/shell.h"
 #include "flutter/shell/common/thread_host.h"
+#include "flutter/shell/platform/android/android_rendering_selector.h"
 #include "flutter/shell/platform/android/apk_asset_provider.h"
 #include "flutter/shell/platform/android/jni/platform_view_android_jni.h"
 #include "flutter/shell/platform/android/platform_view_android.h"
@@ -37,7 +38,8 @@ namespace flutter {
 class AndroidShellHolder {
  public:
   AndroidShellHolder(const flutter::Settings& settings,
-                     std::shared_ptr<PlatformViewAndroidJNI> jni_facade);
+                     std::shared_ptr<PlatformViewAndroidJNI> jni_facade,
+                     AndroidRenderingAPI android_rendering_api);
 
   ~AndroidShellHolder();
 
@@ -76,6 +78,7 @@ class AndroidShellHolder {
       std::shared_ptr<PlatformViewAndroidJNI> jni_facade,
       const std::string& entrypoint,
       const std::string& libraryUrl,
+      const std::string& initial_route,
       const std::vector<std::string>& entrypoint_args,
       int64_t engine_id) const;
 
@@ -89,12 +92,19 @@ class AndroidShellHolder {
 
   fml::WeakPtr<PlatformViewAndroid> GetPlatformView();
 
+  bool IsSurfaceControlEnabled();
+
+  Rasterizer::Screenshot Screenshot(Rasterizer::ScreenshotType type,
+                                    bool base64_encode);
+
   void NotifyLowMemoryWarning();
 
   const std::shared_ptr<PlatformMessageHandler>& GetPlatformMessageHandler()
       const {
     return shell_->GetPlatformMessageHandler();
   }
+
+  void UpdateDisplayMetrics();
 
   // Visible for testing.
   const std::unique_ptr<Shell>& GetShellForTesting() const { return shell_; }
@@ -108,6 +118,7 @@ class AndroidShellHolder {
   bool is_valid_ = false;
   uint64_t next_pointer_flow_id_ = 0;
   std::unique_ptr<APKAssetProvider> apk_asset_provider_;
+  const AndroidRenderingAPI android_rendering_api_;
 
   //----------------------------------------------------------------------------
   /// @brief      Constructor with its components injected.
@@ -125,12 +136,15 @@ class AndroidShellHolder {
                      const std::shared_ptr<ThreadHost>& thread_host,
                      std::unique_ptr<Shell> shell,
                      std::unique_ptr<APKAssetProvider> apk_asset_provider,
-                     const fml::WeakPtr<PlatformViewAndroid>& platform_view);
+                     const fml::WeakPtr<PlatformViewAndroid>& platform_view,
+                     AndroidRenderingAPI rendering_api);
   static void ThreadDestructCallback(void* value);
   std::optional<RunConfiguration> BuildRunConfiguration(
       const std::string& entrypoint,
       const std::string& libraryUrl,
       const std::vector<std::string>& entrypoint_args) const;
+
+  bool IsNDKImageDecoderAvailable();
 
   FML_DISALLOW_COPY_AND_ASSIGN(AndroidShellHolder);
 };

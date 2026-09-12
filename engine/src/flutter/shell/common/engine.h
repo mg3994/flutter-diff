@@ -13,17 +13,22 @@
 #include "flutter/fml/macros.h"
 #include "flutter/fml/mapping.h"
 #include "flutter/fml/memory/weak_ptr.h"
+#include "flutter/lib/ui/painting/image_decoder.h"
+#include "flutter/lib/ui/painting/image_generator_registry.h"
+#include "flutter/lib/ui/semantics/custom_accessibility_action.h"
+#include "flutter/lib/ui/semantics/semantics_node.h"
+#include "flutter/lib/ui/snapshot_delegate.h"
+#include "flutter/lib/ui/text/font_collection.h"
 #include "flutter/lib/ui/window/platform_message.h"
+#include "flutter/lib/ui/window/viewport_metrics.h"
 #include "flutter/runtime/dart_vm.h"
 #include "flutter/runtime/runtime_controller.h"
 #include "flutter/runtime/runtime_delegate.h"
+#include "flutter/shell/common/animator.h"
+#include "flutter/shell/common/pointer_data_dispatcher.h"
 #include "flutter/shell/common/run_configuration.h"
 
 namespace flutter {
-
-namespace testing {
-class ShellTest;
-}
 
 //------------------------------------------------------------------------------
 /// The engine is a component owned by the shell that resides on the UI task
@@ -61,7 +66,7 @@ class ShellTest;
 ///           name and it does happen to be one of the older classes in the
 ///           repository.
 ///
-class Engine final : public RuntimeDelegate {
+class Engine final : public RuntimeDelegate, PointerDataDispatcher::Delegate {
  public:
   //----------------------------------------------------------------------------
   /// @brief      Indicates the result of the call to `Engine::Run`.
@@ -131,6 +136,53 @@ class Engine final : public RuntimeDelegate {
   class Delegate {
    public:
     //--------------------------------------------------------------------------
+    /// @brief      When the accessibility tree has been updated by the Flutter
+    ///             application, this new information needs to be conveyed to
+    ///             the underlying platform. The engine delegates this task to
+    ///             the shell via this call. The engine cannot access the
+    ///             underlying platform directly because of threading
+    ///             considerations. Most platform specific APIs to convey
+    ///             accessibility information are only safe to access on the
+    ///             platform task runner while the engine is running on the UI
+    ///             task runner.
+    ///
+    /// @see        `SemanticsNode`, `SemanticsNodeUpdates`,
+    ///             `CustomAccessibilityActionUpdates`,
+    ///             `PlatformView::UpdateSemantics`
+    ///
+    /// @param[in]  view_id  The ID of the view that this update is for
+    /// @param[in]  updates  A map with the stable semantics node identifier as
+    ///                      key and the node properties as the value.
+    /// @param[in]  actions  A map with the stable semantics node identifier as
+    ///                      key and the custom node action as the value.
+    ///
+    virtual void OnEngineUpdateSemantics(
+        int64_t view_id,
+        SemanticsNodeUpdates updates,
+        CustomAccessibilityActionUpdates actions) = 0;
+
+    //--------------------------------------------------------------------------
+    /// @brief      Framework sets the application locale.
+    ///
+    /// @param[in]  locale  The application locale in BCP 47 format.
+    ///
+    virtual void OnEngineSetApplicationLocale(std::string locale) = 0;
+
+    //--------------------------------------------------------------------------
+    /// @brief      When the Framework starts or stops generating semantics
+    /// tree,
+    ///             this new information needs to be conveyed to the underlying
+    ///             platform so that they can prepare to accept semantics
+    ///             update. The engine delegates this task to the shell via this
+    ///             call.
+    ///
+    /// @see        `OnEngineUpdateSemantics`
+    ///
+    /// @param[in]  enabled  whether Framework starts generating semantics tree.
+    ///
+    virtual void OnEngineSetSemanticsTreeEnabled(bool enabled) = 0;
+
+    //--------------------------------------------------------------------------
     /// @brief      When the Flutter application has a message to send to the
     ///             underlying platform, the message needs to be forwarded to
     ///             the platform on the appropriate thread (via the platform
@@ -184,6 +236,31 @@ class Engine final : public RuntimeDelegate {
     ///
     virtual void UpdateIsolateDescription(const std::string isolate_name,
                                           int64_t isolate_port) = 0;
+
+    //--------------------------------------------------------------------------
+    /// @brief      Notifies the shell that the application has an opinion about
+    ///             whether its frame timings need to be reported backed to it.
+    ///             Due to the asynchronous nature of rendering in Flutter, it
+    ///             is not possible for the application to determine the total
+    ///             time it took to render a specific frame. While the
+    ///             layer-tree is constructed on the UI thread, it needs to be
+    ///             rendering on the raster thread. Dart code cannot execute on
+    ///             this thread. So any instrumentation about the frame times
+    ///             gathered on this thread needs to be aggregated and sent back
+    ///             to the UI thread for processing in Dart.
+    ///
+    ///             When the application indicates that frame times need to be
+    ///             reported, it collects this information till a specified
+    ///             number of data points are gathered. Then this information is
+    ///             sent back to Dart code via `Engine::ReportTimings`.
+    ///
+    ///             This option is engine counterpart of the
+    ///             `Window._setNeedsReportTimings` in `window.dart`.
+    ///
+    /// @param[in]  needs_reporting  If reporting information should be
+    ///                              collected and send back to Dart.
+    ///
+    virtual void SetNeedsReportTimings(bool needs_reporting) = 0;
 
     //--------------------------------------------------------------------------
     /// @brief      Directly invokes platform-specific APIs to compute the
@@ -247,6 +324,36 @@ class Engine final : public RuntimeDelegate {
     ///                              cleared (false).
     ///
     virtual void OnEngineChannelUpdate(std::string name, bool listening) = 0;
+
+    //--------------------------------------------------------------------------
+    /// @brief      Synchronously invokes platform-specific APIs to apply the
+    ///             system text scaling on the given unscaled font size.
+    ///
+    ///             Platforms that support this feature (currently it's only
+    ///             implemented for Android SDK level 34+) will send a valid
+    ///             configuration_id to potential callers, before this method
+    ///             can be called.
+    ///
+    /// @param[in]  unscaled_font_size  The unscaled font size specified by the
+    ///                                 app developer. The value is in logical
+    ///                                 pixels, and is guaranteed to be finite
+    ///                                 and non-negative.
+    /// @param[in]  configuration_id    The unique id of the configuration to
+    ///                                 use for computing the scaled font size.
+    ///
+    /// @return     The scaled font size in logical pixels, or -1 when the given
+    ///             configuration_id did not match a valid configuration.
+    ///
+    virtual double GetScaledFontSize(double unscaled_font_size,
+                                     int configuration_id) const = 0;
+
+    //--------------------------------------------------------------------------
+    /// @brief      Notifies the client that the Flutter view focus state has
+    ///             changed and the platform view should be updated.
+    ///
+    /// @param[in]  request  The request to change the focus state of the view.
+    virtual void RequestViewFocusChange(
+        const ViewFocusChangeRequest& request) = 0;
   };
 
   //----------------------------------------------------------------------------
@@ -255,9 +362,16 @@ class Engine final : public RuntimeDelegate {
   ///             tests.
   ///
   Engine(Delegate& delegate,
+         const PointerDataDispatcherMaker& dispatcher_maker,
+         const std::shared_ptr<fml::ConcurrentTaskRunner>&
+             image_decoder_task_runner,
          const TaskRunners& task_runners,
          const Settings& settings,
-         std::unique_ptr<RuntimeController> runtime_controller);
+         std::unique_ptr<Animator> animator,
+         const fml::WeakPtr<IOManager>& io_manager,
+         const std::shared_ptr<FontCollection>& font_collection,
+         std::unique_ptr<RuntimeController> runtime_controller,
+         const std::shared_ptr<fml::SyncSwitch>& gpu_disabled_switch);
 
   //----------------------------------------------------------------------------
   /// @brief      Creates an instance of the engine. This is done by the Shell
@@ -302,11 +416,19 @@ class Engine final : public RuntimeDelegate {
   ///                                GPU.
   ///
   Engine(Delegate& delegate,
+         const PointerDataDispatcherMaker& dispatcher_maker,
          DartVM& vm,
          fml::RefPtr<const DartSnapshot> isolate_snapshot,
          const TaskRunners& task_runners,
          const PlatformData& platform_data,
-         const Settings& settings);
+         const Settings& settings,
+         std::unique_ptr<Animator> animator,
+         fml::WeakPtr<IOManager> io_manager,
+         const fml::RefPtr<SkiaUnrefQueue>& unref_queue,
+         fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate,
+         const std::shared_ptr<fml::SyncSwitch>& gpu_disabled_switch,
+         const std::shared_future<impeller::RuntimeStageBackend>&
+             runtime_stage_backend);
 
   //----------------------------------------------------------------------------
   /// @brief      Create a Engine that shares as many resources as
@@ -317,8 +439,15 @@ class Engine final : public RuntimeDelegate {
   /// @see        Engine::Engine
   /// @see        DartIsolate::SpawnIsolate
   ///
-  std::unique_ptr<Engine> Spawn(Delegate& delegate,
-                                const Settings& settings) const;
+  std::unique_ptr<Engine> Spawn(
+      Delegate& delegate,
+      const PointerDataDispatcherMaker& dispatcher_maker,
+      const Settings& settings,
+      std::unique_ptr<Animator> animator,
+      const std::string& initial_route,
+      const fml::WeakPtr<IOManager>& io_manager,
+      fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate,
+      const std::shared_ptr<fml::SyncSwitch>& gpu_disabled_switch) const;
 
   //----------------------------------------------------------------------------
   /// @brief      Destroys the engine engine. Called by the shell on the UI task
@@ -377,6 +506,11 @@ class Engine final : public RuntimeDelegate {
   [[nodiscard]] bool Restart(RunConfiguration configuration);
 
   //----------------------------------------------------------------------------
+  /// @brief      Setup default font manager according to specific platform.
+  ///
+  void SetupDefaultFontManager();
+
+  //----------------------------------------------------------------------------
   /// @brief      Updates the asset manager referenced by the root isolate of a
   ///             Flutter application. This happens implicitly in the call to
   ///             `Engine::Run` and `Engine::Restart` as the asset manager is
@@ -397,6 +531,53 @@ class Engine final : public RuntimeDelegate {
   ///             if the new asset manager is invalid.
   ///
   bool UpdateAssetManager(const std::shared_ptr<AssetManager>& asset_manager);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Notifies the engine that it is time to begin working on a new
+  ///             frame previously scheduled via a call to
+  ///             `Engine::ScheduleFrame`. This call originates in the animator.
+  ///
+  ///             The frame time given as the argument indicates the point at
+  ///             which the current frame interval began. It is very slightly
+  ///             (because of scheduling overhead) in the past. If a new layer
+  ///             tree is not produced and given to the raster task runner
+  ///             within one frame interval from this point, the Flutter
+  ///             application will jank.
+  ///
+  ///             If a root isolate is running, this method calls the
+  ///             `::_beginFrame` method in `hooks.dart`. If a root isolate is
+  ///             not running, this call does nothing.
+  ///
+  ///             This method encapsulates the entire UI thread frame workload.
+  ///             The following (mis)behavior in the functioning of the method
+  ///             will cause the jank in the Flutter application:
+  ///             * The time taken by this method to create a layer-tree exceeds
+  ///               one frame interval (for example, 16.66 ms on a 60Hz
+  ///               display).
+  ///             * The time take by this method to generate a new layer-tree
+  ///               causes the current layer-tree pipeline depth to change. To
+  ///               illustrate this point, note that maximum pipeline depth used
+  ///               by layer tree in the engine is 2. If both the UI and GPU
+  ///               task runner tasks finish within one frame interval, the
+  ///               pipeline depth is one. If the UI thread happens to be
+  ///               working on a frame when the raster thread is still not done
+  ///               with the previous frame, the pipeline depth is 2. When the
+  ///               pipeline depth changes from 1 to 2, animations and UI
+  ///               interactions that cause the generation of the new layer tree
+  ///               appropriate for (frame_time + one frame interval) will
+  ///               actually end up at (frame_time + two frame intervals). This
+  ///               is not what code running on the UI thread expected would
+  ///               happen. This causes perceptible jank.
+  ///
+  /// @param[in]  frame_time  The point at which the current frame interval
+  ///                         began. May be used by animation interpolators,
+  ///                         physics simulations, etc..
+  ///
+  /// @param[in]  frame_number The frame number recorded by the animator. Used
+  ///                          by the framework to associate frame specific
+  ///                          debug information with frame timings and timeline
+  ///                          events.
+  void BeginFrame(fml::TimePoint frame_time, uint64_t frame_number);
 
   //----------------------------------------------------------------------------
   /// @brief      Notifies the engine that the UI task runner is not expected to
@@ -437,6 +618,39 @@ class Engine final : public RuntimeDelegate {
   ///                       deadline.
   ///
   void NotifyIdle(fml::TimeDelta deadline);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Dart code cannot fully measure the time it takes for a
+  ///             specific frame to be rendered. This is because Dart code only
+  ///             runs on the UI task runner. That is only a small part of the
+  ///             overall frame workload. The raster task runner frame workload
+  ///             is executed on a thread where Dart code cannot run (and hence
+  ///             instrument). Besides, due to the pipelined nature of rendering
+  ///             in Flutter, there may be multiple frame workloads being
+  ///             processed at any given time. However, for non-Timeline based
+  ///             profiling, it is useful for trace collection and processing to
+  ///             happen in Dart. To do this, the raster task runner frame
+  ///             workloads need to be instrumented separately. After a set
+  ///             number of these profiles have been gathered, they need to be
+  ///             reported back to Dart code. The shell reports this extra
+  ///             instrumentation information back to Dart code running on the
+  ///             engine by invoking this method at predefined intervals.
+  ///
+  /// @see        `FrameTiming`
+  ///
+  //  TODO(chinmaygarde): The use `int64_t` is added for ease of conversion to
+  //  Dart but hurts readability. The phases and the units of the timepoints are
+  //  not obvious without some sleuthing. The conversion can happen at the
+  //  native interface boundary instead.
+  ///
+  /// @param[in]  timings  Collection of `FrameTiming::kCount` * `n` timestamps
+  ///                      for `n` frames whose timings have not been reported
+  ///                      yet. A collection of integers is reported here for
+  ///                      easier conversions to Dart objects. The timestamps
+  ///                      are measured against the system monotonic clock
+  ///                      measured in microseconds.
+  ///
+  void ReportTimings(std::vector<int64_t> timings);
 
   //----------------------------------------------------------------------------
   /// @brief      Gets the main port of the root isolate. Since the isolate is
@@ -527,6 +741,64 @@ class Engine final : public RuntimeDelegate {
   std::optional<uint32_t> GetUIIsolateReturnCode();
 
   //----------------------------------------------------------------------------
+  /// @brief      Notify the Flutter application that a new view is available.
+  ///
+  ///             A view must be added before other methods can refer to it,
+  ///             including the implicit view. Adding a view that already exists
+  ///             triggers an assertion.
+  ///
+  /// @param[in]  view_id           The ID of the new view.
+  /// @param[in]  viewport_metrics  The initial viewport metrics for the view.
+  /// @param[in]  callback          Callback that will be invoked once
+  ///                               the engine attempts to add the view.
+  ///
+  void AddView(int64_t view_id,
+               const ViewportMetrics& view_metrics,
+               std::function<void(bool added)> callback);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Notify the Flutter application that a view is no
+  ///             longer available.
+  ///
+  ///             Removing a view that does not exist triggers an assertion.
+  ///
+  ///             The implicit view (kFlutterImplicitViewId) should never be
+  ///             removed. Doing so triggers an assertion.
+  ///
+  /// @param[in]  view_id  The ID of the view.
+  ///
+  /// @return     Whether the view was removed.
+  ///
+  bool RemoveView(int64_t view_id);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Notify the Flutter application that the focus state of a
+  ///             native view has changed.
+  ///
+  /// @param[in]  event  The focus event describing the change.
+  bool SendViewFocusEvent(const ViewFocusEvent& event);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Updates the viewport metrics for a view. The viewport metrics
+  ///             detail the size of the rendering viewport in texels as well as
+  ///             edge insets if present.
+  ///
+  /// @see        `ViewportMetrics`
+  ///
+  /// @param[in]  view_id  The ID for the view that `metrics` describes.
+  /// @param[in]  metrics  The metrics.
+  ///
+  void SetViewportMetrics(int64_t view_id, const ViewportMetrics& metrics);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Updates the display metrics for the currently running Flutter
+  ///             application.
+  ///
+  /// @param[in]  displays  A complete list of displays
+  ///
+  void SetDisplays(const std::vector<DisplayData>& displays);
+
+  //----------------------------------------------------------------------------
   /// @brief      Notifies the engine that the embedder has sent it a message.
   ///             This call originates in the platform view and has been
   ///             forwarded to the engine on the UI task runner here.
@@ -536,8 +808,118 @@ class Engine final : public RuntimeDelegate {
   ///
   void DispatchPlatformMessage(std::unique_ptr<PlatformMessage> message);
 
+  //----------------------------------------------------------------------------
+  /// @brief      Notifies the engine that the embedder has sent it a pointer
+  ///             data packet. A pointer data packet may contain multiple
+  ///             input events. This call originates in the platform view and
+  ///             the shell has forwarded the same to the engine on the UI task
+  ///             runner here.
+  ///
+  /// @param[in]  packet         The pointer data packet containing multiple
+  ///                            input events.
+  /// @param[in]  trace_flow_id  The trace flow identifier associated with the
+  ///                            pointer data packet. The engine uses this trace
+  ///                            identifier to connect trace flows in the
+  ///                            timeline from the input event to the
+  ///                            frames generated due to those input events.
+  ///                            These flows are tagged as "PointerEvent" in the
+  ///                            timeline and allow grouping frames and input
+  ///                            events into logical chunks.
+  ///
+  void DispatchPointerDataPacket(std::unique_ptr<PointerDataPacket> packet,
+                                 uint64_t trace_flow_id);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Requests to perform framework hit test from the engine.
+  ///
+  /// @param[in]  view_id The identifier of the flutter view that
+  ///                     should be hit tested.
+  /// @param[in]  offset  The position in the view that should be hit tested.
+  ///
+  /// @return     The hit test response.
+  ///
+  HitTestResponse HitTest(int64_t view_id, const flutter::PointData offset);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Notifies the engine that the embedder encountered an
+  ///             accessibility related action on the specified node. This call
+  ///             originates on the platform view and has been forwarded to the
+  ///             engine here on the UI task runner by the shell.
+  ///
+  /// @param[in]  view_id The identifier of the view.
+  /// @param[in]  node_id The identifier of the accessibility node.
+  /// @param[in]  action  The accessibility related action performed on the
+  ///                     node of the specified ID.
+  /// @param[in]  args    Optional data that applies to the specified action.
+  ///
+  void DispatchSemanticsAction(int64_t view_id,
+                               int node_id,
+                               SemanticsAction action,
+                               fml::MallocMapping args);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Notifies the engine that the embedder has expressed an opinion
+  ///             about whether the accessibility tree should be generated or
+  ///             not. This call originates in the platform view and is
+  ///             forwarded to the engine here on the UI task runner by the
+  ///             shell.
+  ///
+  /// @param[in]  enabled  Whether the accessibility tree is enabled or
+  ///                      disabled.
+  ///
+  void SetSemanticsEnabled(bool enabled);
+
+  //----------------------------------------------------------------------------
+  /// @brief      Notifies the engine that the embedder has expressed an opinion
+  ///             about where the flags to set on the accessibility tree. This
+  ///             flag originates in the platform view and is forwarded to the
+  ///             engine here on the UI task runner by the shell.
+  ///
+  ///             The engine does not care about the accessibility feature flags
+  ///             as all it does is forward this information from the embedder
+  ///             to the framework. However, curious readers may refer to
+  ///             `AccessibilityFeatures` in `window.dart` for currently
+  ///             supported accessibility feature flags.
+  ///
+  /// @param[in]  flags  The features to enable in the accessibility tree.
+  ///
+  void SetAccessibilityFeatures(int32_t flags);
+
+  // |RuntimeDelegate|
+  void ScheduleFrame(bool regenerate_layer_trees) override;
+
+  /// Schedule a frame with the default parameter of regenerating the layer
+  /// tree.
+  void ScheduleFrame() { ScheduleFrame(true); }
+
+  // |RuntimeDelegate|
+  void OnAllViewsRendered() override;
+
+  // |RuntimeDelegate|
+  FontCollection& GetFontCollection() override;
+
   // |RuntimeDelegate|
   std::shared_ptr<AssetManager> GetAssetManager() override;
+
+  // Return the weak_ptr of ImageDecoder.
+  fml::TaskRunnerAffineWeakPtr<ImageDecoder> GetImageDecoderWeakPtr();
+
+  //----------------------------------------------------------------------------
+  /// @brief      Get the `ImageGeneratorRegistry` associated with the current
+  ///             engine.
+  ///
+  /// @return     The engine's `ImageGeneratorRegistry`.
+  ///
+  fml::TaskRunnerAffineWeakPtr<ImageGeneratorRegistry>
+  GetImageGeneratorRegistry();
+
+  // |PointerDataDispatcher::Delegate|
+  void DoDispatchPacket(std::unique_ptr<PointerDataPacket> packet,
+                        uint64_t trace_flow_id) override;
+
+  // |PointerDataDispatcher::Delegate|
+  void ScheduleSecondaryVsyncCallback(uintptr_t id,
+                                      const fml::closure& callback) override;
 
   //----------------------------------------------------------------------------
   /// @brief      Get the last Entrypoint that was used in the RunConfiguration
@@ -562,6 +944,12 @@ class Engine final : public RuntimeDelegate {
   ///             valid in debug mode.
   ///
   const std::vector<std::string>& GetLastEntrypointArgs() const;
+
+  //----------------------------------------------------------------------------
+  /// @brief      Getter for the initial route.  This can be set with a platform
+  ///             message.
+  ///
+  const std::string& InitialRoute() const { return initial_route_; }
 
   //--------------------------------------------------------------------------
   /// @brief      Loads the Dart shared library into the Dart VM. When the
@@ -632,6 +1020,8 @@ class Engine final : public RuntimeDelegate {
     return runtime_controller_.get();
   }
 
+  const std::weak_ptr<VsyncWaiter> GetVsyncWaiter() const;
+
   //--------------------------------------------------------------------------
   /// @brief      Shuts down all registered platform isolates. Must be called
   ///             from the platform thread.
@@ -644,6 +1034,25 @@ class Engine final : public RuntimeDelegate {
   void FlushMicrotaskQueue();
 
  private:
+  // |RuntimeDelegate|
+  std::string DefaultRouteName() override;
+
+  // |RuntimeDelegate|
+  void Render(int64_t view_id,
+              std::unique_ptr<flutter::LayerTree> layer_tree,
+              float device_pixel_ratio) override;
+
+  // |RuntimeDelegate|
+  void UpdateSemantics(int64_t view_id,
+                       SemanticsNodeUpdates update,
+                       CustomAccessibilityActionUpdates actions) override;
+
+  // |RuntimeDelegate|
+  void SetApplicationLocale(std::string locale) override;
+
+  // |RuntimeDelegate|
+  void SetSemanticsTreeEnabled(bool enabled) override;
+
   // |RuntimeDelegate|
   void HandlePlatformMessage(std::unique_ptr<PlatformMessage> message) override;
 
@@ -668,7 +1077,23 @@ class Engine final : public RuntimeDelegate {
   // |RuntimeDelegate|
   void SendChannelUpdate(std::string name, bool listening) override;
 
+  // |RuntimeDelegate|
+  double GetScaledFontSize(double unscaled_font_size,
+                           int configuration_id) const override;
+
+  // |RuntimeDelegate|
+  void RequestViewFocusChange(const ViewFocusChangeRequest& request) override;
+
+  void SetNeedsReportTimings(bool value) override;
+
+  bool HandleLifecyclePlatformMessage(PlatformMessage* message);
+
+  bool HandleNavigationPlatformMessage(
+      std::unique_ptr<PlatformMessage> message);
+
   bool HandleLocalizationPlatformMessage(PlatformMessage* message);
+
+  void HandleSettingsPlatformMessage(PlatformMessage* message);
 
   void HandleAssetPlatformMessage(std::unique_ptr<PlatformMessage> message);
 
@@ -678,14 +1103,24 @@ class Engine final : public RuntimeDelegate {
 
   Engine::Delegate& delegate_;
   const Settings settings_;
+  std::unique_ptr<Animator> animator_;
   std::unique_ptr<RuntimeController> runtime_controller_;
+
+  // The pointer_data_dispatcher_ depends on animator_ and runtime_controller_.
+  // So it should be defined after them to ensure that pointer_data_dispatcher_
+  // is destructed first.
+  std::unique_ptr<PointerDataDispatcher> pointer_data_dispatcher_;
 
   std::string last_entry_point_;
   std::string last_entry_point_library_;
   std::vector<std::string> last_entry_point_args_;
   std::optional<int64_t> last_engine_id_;
+  std::string initial_route_;
   std::shared_ptr<AssetManager> asset_manager_;
+  std::shared_ptr<FontCollection> font_collection_;
   std::shared_ptr<NativeAssetsManager> native_assets_manager_;
+  const std::unique_ptr<ImageDecoder> image_decoder_;
+  ImageGeneratorRegistry image_generator_registry_;
   TaskRunners task_runners_;
   fml::TaskRunnerAffineWeakPtrFactory<Engine>
       weak_factory_;  // Must be the last member.

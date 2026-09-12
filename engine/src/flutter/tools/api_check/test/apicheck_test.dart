@@ -60,11 +60,26 @@ void checkApiConsistency(String flutterRoot) {
         'AccessibilityBridge.java',
       ),
       enumName: 'AccessibilityFeature',
-    ).map(allCapsToCamelCase).toList();
+    ).map(upperSnakeCaseToPascalCase).toList();
+    // Swift values: static let fooBar = AccessibilityFeatureFlag(rawValue: 1 << N).
+    final List<String> swiftOptionSetProperties = getSwiftOptionSetProperties(
+      sourcePath: path.join(
+        flutterRoot,
+        'shell',
+        'platform',
+        'darwin',
+        'ios',
+        'framework',
+        'Source',
+        'AccessibilityFeatures.swift',
+      ),
+      optionSetName: 'AccessibilityFeatureFlag',
+    ).map(camelCaseToPascalCase).toList();
 
     expect(embedderEnumValues, uiFields);
     expect(internalEnumValues, uiFields);
     expect(javaEnumValues, uiFields);
+    expect(swiftOptionSetProperties, uiFields);
   });
 
   test('SemanticsAction enums match', () async {
@@ -100,7 +115,7 @@ void checkApiConsistency(String flutterRoot) {
         'AccessibilityBridge.java',
       ),
       enumName: 'Action',
-    ).map(allCapsToCamelCase).toList();
+    ).map(upperSnakeCaseToPascalCase).toList();
 
     expect(webuiFields, uiFields);
     expect(embedderEnumValues, uiFields);
@@ -118,6 +133,11 @@ void checkApiConsistency(String flutterRoot) {
       sourcePath: path.join(flutterRoot, 'lib', 'web_ui', 'lib', 'platform_dispatcher.dart'),
       className: 'AppLifecycleState',
     );
+    // C++ values: kFooBar = 1 << N.
+    final List<String> internalEnumValues = getCppEnumClassValues(
+      sourcePath: path.join(flutterRoot, 'shell', 'platform', 'common', 'app_lifecycle_state.h'),
+      enumName: 'AppLifecycleState',
+    );
     // Java values: FOO_BAR(1 << N).
     final List<String> javaEnumValues = getJavaEnumValues(
       sourcePath: path.join(
@@ -133,21 +153,22 @@ void checkApiConsistency(String flutterRoot) {
         'LifecycleChannel.java',
       ),
       enumName: 'AppLifecycleState',
-    ).map(allCapsToCamelCase).toList();
+    ).map(upperSnakeCaseToPascalCase).toList();
 
     expect(webuiFields, uiFields);
+    expect(internalEnumValues, uiFields);
     expect(javaEnumValues, uiFields);
   });
 
   // TODO(hangyujin): Add this test back after fixing https://github.com/flutter/flutter/issues/166101
 
-  // test('SemanticsFlag enums match', () {
+  // test('SemanticsFlag enums match', () async {
   //   // Dart values: _kFooBarIndex = 1 << N.
-  //   final List<String> uiFields = getDartClassFields(
+  //   final List<String> uiFields = await getDartClassFields(
   //     sourcePath: path.join(flutterRoot, 'lib', 'ui', 'semantics.dart'),
   //     className: 'SemanticsFlag',
   //   );
-  //   final List<String> webuiFields = getDartClassFields(
+  //   final List<String> webuiFields = await getDartClassFields(
   //     sourcePath: path.join(flutterRoot, 'lib', 'ui', 'semantics.dart'),
   //     className: 'SemanticsFlag',
   //   );
@@ -184,8 +205,8 @@ void checkApiConsistency(String flutterRoot) {
   // });
 }
 
-/// Returns the CamelCase equivalent of an ALL_CAPS identifier.
-String allCapsToCamelCase(String identifier) {
+/// Returns the PascalCase equivalent of an UPPER_SNAKE_CASE identifier.
+String upperSnakeCaseToPascalCase(String identifier) {
   final buffer = StringBuffer();
   for (final String word in identifier.split('_')) {
     if (word.isNotEmpty) {
@@ -196,6 +217,14 @@ String allCapsToCamelCase(String identifier) {
     }
   }
   return buffer.toString();
+}
+
+/// Returns the PascalCase equivalent of an camelCase identifier.
+String camelCaseToPascalCase(String identifier) {
+  if (identifier.isEmpty) {
+    return identifier;
+  }
+  return identifier[0].toUpperCase() + identifier.substring(1);
 }
 
 /// Verify that the native functions in the dart:ui package do not use nullable
@@ -233,11 +262,21 @@ class NativeFunctionVisitor extends RecursiveAstVisitor<void> {
   void check(String description, FormalParameterList parameters) {
     for (final FormalParameter parameter in parameters.parameters) {
       TypeAnnotation? type;
-      if (parameter is SimpleFormalParameter) {
-        type = parameter.type;
-      } else if (parameter is DefaultFormalParameter) {
-        type = (parameter.parameter as SimpleFormalParameter).type;
+      try {
+        // ignore: avoid_dynamic_calls
+        type = (parameter as dynamic).type as TypeAnnotation?;
+      } catch (_) {
+        try {
+          // ignore: avoid_dynamic_calls
+          type = (parameter as dynamic).parameter.type as TypeAnnotation?;
+        } catch (_) {
+          // Ignore if not accessible.
+        }
       }
+      // Clean Analyzer 13 version (uncomment once migrated):
+      // if (parameter is RegularFormalParameter) {
+      //   type = parameter.type;
+      // }
       if (type! is NamedType) {
         final String name = (type as NamedType).name.lexeme;
         if (type.question != null && simpleTypes.contains(name)) {

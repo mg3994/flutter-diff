@@ -76,16 +76,18 @@ name: _engine_workspace
 
 # Required for workspace support.
 environment:
-  sdk: ^3.9.0-0
+  sdk: ^3.11.0-0
 
 # Declare all packages that are part of the workspace.
 workspace:
   - ci
   - flutter_frontend_server
+  - impeller/tessellator/dart
   - shell/vmservice
   - testing/benchmark
   - testing/dart
   - testing/ios_scenario_app
+  - testing/skia_gold_client
   - testing/smoke_test_failure
   - testing/symbols
   - tools/android_lint
@@ -93,17 +95,19 @@ workspace:
   - tools/build_bucket_golden_scraper
   - tools/clang_tidy
   - tools/clangd_check
+  - tools/compare_goldens
   - tools/const_finder
   - tools/engine_tool
   - tools/header_guard_check
   - tools/gen_web_locale_keymap
   - tools/githooks
   - tools/mcp
+  - tools/path_ops/dart
+  - tools/golden_tests_harvester
   - tools/pkg/engine_build_configs
   - tools/pkg/engine_repo_tools
   - tools/pkg/git_repo_tools
   - tools/pkg/process_fakes
-  - tools/pkg/github_workflow_generator
 
 # Declare all dependencies that are used by one or more packages.
 #
@@ -134,6 +138,8 @@ dependencies:
 dev_dependencies:
   process_fakes:
     path: ./tools/pkg/process_fakes
+  skia_gold_client:
+    path: ./testing/skia_gold_client
 
 # Instructs pub on how to resolve the dependencies that are part of "DEPS".
 #

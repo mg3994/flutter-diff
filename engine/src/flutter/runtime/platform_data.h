@@ -5,8 +5,12 @@
 #ifndef FLUTTER_RUNTIME_PLATFORM_DATA_H_
 #define FLUTTER_RUNTIME_PLATFORM_DATA_H_
 
+#include <memory>
 #include <string>
 #include <vector>
+
+#include "flutter/lib/ui/window/viewport_metrics.h"
+#include "flutter/shell/common/display.h"
 
 namespace flutter {
 
@@ -28,6 +32,9 @@ struct PlatformData {
 
   ~PlatformData();
 
+  // A map from view IDs of existing views to their viewport metrics.
+  std::unordered_map<int64_t, ViewportMetrics> viewport_metrics_for_views;
+
   std::string language_code;
   std::string country_code;
   std::string script_code;
@@ -35,8 +42,10 @@ struct PlatformData {
   std::vector<std::string> locale_data;
   std::string user_settings_data = "{}";
   std::string lifecycle_state;
+  bool semantics_enabled = false;
   bool assistive_technology_enabled = false;
   int32_t accessibility_feature_flags_ = 0;
+  std::vector<DisplayData> displays;
 };
 
 }  // namespace flutter

@@ -6,10 +6,13 @@
 #define FLUTTER_SHELL_PLATFORM_EMBEDDER_EMBEDDER_ENGINE_H_
 
 #include <memory>
+#include <unordered_map>
 
 #include "flutter/fml/macros.h"
 #include "flutter/shell/common/shell.h"
+#include "flutter/shell/common/thread_host.h"
 #include "flutter/shell/platform/embedder/embedder.h"
+#include "flutter/shell/platform/embedder/embedder_external_texture_resolver.h"
 #include "flutter/shell/platform/embedder/embedder_thread_host.h"
 namespace flutter {
 
@@ -24,7 +27,10 @@ class EmbedderEngine {
       const TaskRunners& task_runners,
       const Settings& settings,
       RunConfiguration run_configuration,
-      const Shell::CreateCallback<PlatformView>& on_create_platform_view);
+      const Shell::CreateCallback<PlatformView>& on_create_platform_view,
+      const Shell::CreateCallback<Rasterizer>& on_create_rasterizer,
+      std::unique_ptr<EmbedderExternalTextureResolver>
+          external_texture_resolver);
 
   ~EmbedderEngine();
 
@@ -44,7 +50,36 @@ class EmbedderEngine {
 
   bool IsValid() const;
 
+  bool SetViewportMetrics(int64_t view_id,
+                          const flutter::ViewportMetrics& metrics);
+
+  bool DispatchPointerDataPacket(
+      std::unique_ptr<flutter::PointerDataPacket> packet);
+
   bool SendPlatformMessage(std::unique_ptr<PlatformMessage> message);
+
+  bool RegisterTexture(int64_t texture);
+
+  bool UnregisterTexture(int64_t texture);
+
+  bool MarkTextureFrameAvailable(int64_t texture);
+
+  bool SetSemanticsEnabled(bool enabled);
+
+  bool SetAccessibilityFeatures(int32_t flags);
+
+  bool DispatchSemanticsAction(int64_t view_id,
+                               int node_id,
+                               flutter::SemanticsAction action,
+                               fml::MallocMapping args);
+
+  bool OnVsyncEvent(intptr_t baton,
+                    fml::TimePoint frame_start_time,
+                    fml::TimePoint frame_target_time);
+
+  bool ReloadSystemFonts();
+
+  bool PostRenderThreadTask(const fml::closure& task);
 
   bool RunTask(const FlutterTask* task);
 
@@ -61,6 +96,7 @@ class EmbedderEngine {
   RunConfiguration run_configuration_;
   std::unique_ptr<ShellArgs> shell_args_;
   std::unique_ptr<Shell> shell_;
+  std::unique_ptr<EmbedderExternalTextureResolver> external_texture_resolver_;
 
   FML_DISALLOW_COPY_AND_ASSIGN(EmbedderEngine);
 };

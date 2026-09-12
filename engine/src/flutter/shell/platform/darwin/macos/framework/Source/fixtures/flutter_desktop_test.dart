@@ -36,8 +36,49 @@ void canLogToStdout() {
 }
 
 @pragma('vm:entry-point')
+void canCompositePlatformViews() {
+  PlatformDispatcher.instance.onBeginFrame = (Duration duration) {
+    final builder = SceneBuilder();
+    builder.addPicture(const Offset(1.0, 1.0), _createSimplePicture());
+    builder.pushOffset(1.0, 2.0);
+    builder.addPlatformView(42, width: 123.0, height: 456.0);
+    builder.addPicture(const Offset(1.0, 1.0), _createSimplePicture());
+    builder.pop(); // offset
+    PlatformDispatcher.instance.views.first.render(builder.build());
+  };
+  PlatformDispatcher.instance.scheduleFrame();
+}
+
+@pragma('vm:entry-point')
+void drawIntoAllViews() {
+  PlatformDispatcher.instance.onBeginFrame = (Duration duration) {
+    final builder = SceneBuilder();
+    builder.addPicture(const Offset(1.0, 1.0), _createSimplePicture());
+    for (final FlutterView view in PlatformDispatcher.instance.views) {
+      view.render(builder.build());
+    }
+  };
+  PlatformDispatcher.instance.scheduleFrame();
+}
+
+/// Returns a [Picture] of a simple black square.
+Picture _createSimplePicture() {
+  final blackPaint = Paint();
+  final baseRecorder = PictureRecorder();
+  final canvas = Canvas(baseRecorder);
+  canvas.drawRect(const Rect.fromLTRB(0.0, 0.0, 1000.0, 1000.0), blackPaint);
+  return baseRecorder.endRecording();
+}
+
+@pragma('vm:entry-point')
 void nativeCallback() {
   signalNativeTest();
+}
+
+@pragma('vm:entry-point')
+void backgroundTest() {
+  PlatformDispatcher.instance.views.first.render(SceneBuilder().build());
+  signalNativeTest(); // should look black
 }
 
 @pragma('vm:entry-point')
@@ -52,3 +93,11 @@ external void notifyEngineId(int? engineId);
 void testEngineId() {
   notifyEngineId(PlatformDispatcher.instance.engineId);
 }
+
+@pragma('vm:entry-point')
+void testWindowController() {
+  signalNativeTest();
+}
+
+@pragma('vm:entry-point')
+void testWindowControllerRetainCycle() {}

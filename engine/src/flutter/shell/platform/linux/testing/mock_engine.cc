@@ -10,11 +10,15 @@
 // Over time existing tests should be migrated and this file should be removed.
 
 #include <cstring>
+#include <unordered_map>
+#include <utility>
 
 #include "flutter/shell/platform/embedder/embedder.h"
+#include "flutter/shell/platform/linux/fl_method_codec_private.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_json_message_codec.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_method_response.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_standard_method_codec.h"
+#include "gtest/gtest.h"
 
 struct _FlutterEngine {
   _FlutterEngine() {}
@@ -33,6 +37,7 @@ FlutterEngineResult FlutterEngineCollectAOTData(FlutterEngineAOTData data) {
 }
 
 FlutterEngineResult FlutterEngineInitialize(size_t version,
+                                            const FlutterRendererConfig* config,
                                             const FlutterProjectArgs* args,
                                             void* user_data,
                                             FLUTTER_API_SYMBOL(FlutterEngine) *
@@ -47,6 +52,7 @@ FlutterEngineResult FlutterEngineRunInitialized(
 }
 
 FlutterEngineResult FlutterEngineRun(size_t version,
+                                     const FlutterRendererConfig* config,
                                      const FlutterProjectArgs* args,
                                      void* user_data,
                                      FLUTTER_API_SYMBOL(FlutterEngine) *
@@ -62,6 +68,27 @@ FlutterEngineResult FlutterEngineShutdown(FLUTTER_API_SYMBOL(FlutterEngine)
 
 FlutterEngineResult FlutterEngineDeinitialize(FLUTTER_API_SYMBOL(FlutterEngine)
                                                   engine) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineSendWindowMetricsEvent(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    const FlutterWindowMetricsEvent* event) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineSendPointerEvent(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    const FlutterPointerEvent* events,
+    size_t events_count) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineSendKeyEvent(FLUTTER_API_SYMBOL(FlutterEngine)
+                                                  engine,
+                                              const FlutterKeyEvent* event,
+                                              FlutterKeyEventCallback callback,
+                                              void* user_data) {
   return kSuccess;
 }
 
@@ -111,6 +138,62 @@ FlutterEngineResult FlutterEngineUpdateLocales(FLUTTER_API_SYMBOL(FlutterEngine)
   return kSuccess;
 }
 
+FlutterEngineResult FlutterEngineUpdateSemanticsEnabled(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    bool enabled) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineUpdateAccessibilityFeatures(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    FlutterAccessibilityFeature features) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineSendSemanticsAction(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    const FlutterSendSemanticsActionInfo* info) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineRegisterExternalTexture(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    int64_t texture_identifier) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineMarkExternalTextureFrameAvailable(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    int64_t texture_identifier) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineUnregisterExternalTexture(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    int64_t texture_identifier) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineNotifyDisplayUpdate(
+    FLUTTER_API_SYMBOL(FlutterEngine) engine,
+    FlutterEngineDisplaysUpdateType update_type,
+    const FlutterEngineDisplay* displays,
+    size_t display_count) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineAddView(FLUTTER_API_SYMBOL(FlutterEngine)
+                                             engine,
+                                         const FlutterAddViewInfo* info) {
+  return kSuccess;
+}
+
+FlutterEngineResult FlutterEngineRemoveView(FLUTTER_API_SYMBOL(FlutterEngine)
+                                                engine,
+                                            const FlutterRemoveViewInfo* info) {
+  return kSuccess;
+}
+
 }  // namespace
 
 FlutterEngineResult FlutterEngineGetProcAddresses(
@@ -129,6 +212,9 @@ FlutterEngineResult FlutterEngineGetProcAddresses(
   table->Initialize = &FlutterEngineInitialize;
   table->Deinitialize = &FlutterEngineDeinitialize;
   table->RunInitialized = &FlutterEngineRunInitialized;
+  table->SendWindowMetricsEvent = &FlutterEngineSendWindowMetricsEvent;
+  table->SendPointerEvent = &FlutterEngineSendPointerEvent;
+  table->SendKeyEvent = &FlutterEngineSendKeyEvent;
   table->SendPlatformMessage = &FlutterEngineSendPlatformMessage;
   table->PlatformMessageCreateResponseHandle =
       &FlutterPlatformMessageCreateResponseHandle;
@@ -138,6 +224,17 @@ FlutterEngineResult FlutterEngineGetProcAddresses(
       &FlutterEngineSendPlatformMessageResponse;
   table->RunTask = &FlutterEngineRunTask;
   table->UpdateLocales = &FlutterEngineUpdateLocales;
+  table->UpdateSemanticsEnabled = &FlutterEngineUpdateSemanticsEnabled;
+  table->SendSemanticsAction = &FlutterEngineSendSemanticsAction;
   table->RunsAOTCompiledDartCode = &FlutterEngineRunsAOTCompiledDartCode;
+  table->RegisterExternalTexture = &FlutterEngineRegisterExternalTexture;
+  table->MarkExternalTextureFrameAvailable =
+      &FlutterEngineMarkExternalTextureFrameAvailable;
+  table->UnregisterExternalTexture = &FlutterEngineUnregisterExternalTexture;
+  table->UpdateAccessibilityFeatures =
+      &FlutterEngineUpdateAccessibilityFeatures;
+  table->NotifyDisplayUpdate = &FlutterEngineNotifyDisplayUpdate;
+  table->AddView = &FlutterEngineAddView;
+  table->RemoveView = &FlutterEngineRemoveView;
   return kSuccess;
 }

@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "builtin_libraries.h"
+#include "flutter/shell/platform/fuchsia/dart_runner/builtin_libraries.h"
 
 #include <lib/fdio/namespace.h>
 #include <lib/zx/channel.h>
 
 #include <optional>
 
-#include "dart-pkg/fuchsia/sdk_ext/fuchsia.h"
 #include "flutter/fml/logging.h"
-#include "runtime/dart/utils/inlines.h"
+#include "flutter/shell/platform/fuchsia/dart_pkg/fuchsia/sdk_ext/fuchsia.h"
+#include "flutter/shell/platform/fuchsia/runtime/dart/utils/inlines.h"
 #include "third_party/dart/runtime/bin/io_natives.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 #include "third_party/tonic/converter/dart_converter.h"
 #include "third_party/tonic/dart_microtask_queue.h"
 #include "third_party/tonic/logging/dart_error.h"
-
-#include "logging.h"
 
 using tonic::ToDart;
 
@@ -227,6 +225,14 @@ void InitBuiltinLibrariesForIsolate(const std::string& script_uri,
   FML_CHECK(!tonic::CheckAndHandleError(uri_base));
 
   result = Dart_SetField(core_lib, ToDart("_uriBaseClosure"), uri_base);
+  FML_CHECK(!tonic::CheckAndHandleError(result));
+
+  Dart_Handle setup_hooks = ToDart("_setupHooks");
+  result = Dart_Invoke(builtin_lib, setup_hooks, 0, nullptr);
+  FML_CHECK(!tonic::CheckAndHandleError(result));
+  result = Dart_Invoke(io_lib, setup_hooks, 0, nullptr);
+  FML_CHECK(!tonic::CheckAndHandleError(result));
+  result = Dart_Invoke(isolate_lib, setup_hooks, 0, nullptr);
   FML_CHECK(!tonic::CheckAndHandleError(result));
 }
 

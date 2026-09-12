@@ -15,9 +15,12 @@
 #import "FlutterEngineGroup.h"
 #import "FlutterHeadlessDartRunner.h"
 #import "FlutterMacros.h"
+#import "FlutterPlatformViews.h"
 #import "FlutterPlugin.h"
 #import "FlutterPluginAppLifeCycleDelegate.h"
 #import "FlutterSceneDelegate.h"
 #import "FlutterSceneLifeCycle.h"
+#import "FlutterTexture.h"
+#import "FlutterViewController.h"
 
 #endif  // FLUTTER_SHELL_PLATFORM_DARWIN_IOS_FRAMEWORK_HEADERS_FLUTTER_H_

@@ -6,38 +6,68 @@
 #define FLUTTER_SHELL_PLATFORM_DARWIN_IOS_FRAMEWORK_SOURCE_FLUTTERENGINE_INTERNAL_H_
 
 #import "flutter/shell/platform/darwin/ios/framework/Headers/FlutterEngine.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterFMLTaskRunner+FML.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterFMLTaskRunner.h"
 
 #include "flutter/fml/memory/weak_ptr.h"
 #include "flutter/fml/task_runner.h"
+#include "flutter/lib/ui/window/pointer_data_packet.h"
+#include "flutter/lib/ui/window/viewport_metrics.h"
 #include "flutter/shell/common/platform_view.h"
+#include "flutter/shell/common/rasterizer.h"
 #include "flutter/shell/common/shell.h"
 
 #include "flutter/shell/platform/embedder/embedder.h"
 
 #import "flutter/shell/platform/darwin/ios/framework/Headers/FlutterEngine.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterDartProject_Internal.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterIndirectScribbleDelegate.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterPlatformPlugin.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterPlatformViews_Internal.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterRestorationPlugin.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterSceneLifeCycle_Internal.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputDelegate.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterTextInputPlugin.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterView.h"
+
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine+TaskRunners.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface FlutterEngine ()
+@interface FlutterEngine () <FlutterViewEngineDelegate>
 
 // Indicates whether this engine has **ever** been manually registered to a scene.
 @property(nonatomic, assign) BOOL manuallyRegisteredToScene;
 
-- (fml::RefPtr<fml::TaskRunner>)platformTaskRunner;
-- (fml::RefPtr<fml::TaskRunner>)uiTaskRunner;
+- (void)updateViewportMetrics:(flutter::ViewportMetrics)viewportMetrics;
+- (void)dispatchPointerDataPacket:(std::unique_ptr<flutter::PointerDataPacket>)packet;
+- (BOOL)platformViewShouldAcceptTouchAtTouchBeganLocation:(flutter::PointData)location
+                                                   viewId:(uint64_t)viewId;
 
+- (void)installFirstFrameCallback:(void (^)(void))block;
+- (void)enableSemantics:(BOOL)enabled withFlags:(int64_t)flags;
+- (void)notifyViewCreated;
+- (void)notifyViewDestroyed;
+
+- (flutter::Rasterizer::Screenshot)screenshot:(flutter::Rasterizer::ScreenshotType)type
+                                 base64Encode:(bool)base64Encode;
+
+- (FlutterPlatformPlugin*)platformPlugin;
+- (FlutterTextInputPlugin*)textInputPlugin;
+- (FlutterRestorationPlugin*)restorationPlugin;
 - (FlutterEnginePluginSceneLifeCycleDelegate*)sceneLifeCycleDelegate;
-
 - (void)launchEngine:(nullable NSString*)entrypoint
           libraryURI:(nullable NSString*)libraryOrNil
       entrypointArgs:(nullable NSArray<NSString*>*)entrypointArgs;
 - (BOOL)createShell:(nullable NSString*)entrypoint
          libraryURI:(nullable NSString*)libraryOrNil
        initialRoute:(nullable NSString*)initialRoute;
-
+- (void)attachView;
 - (void)notifyLowMemory;
+
+/// Asynchronously waits until the first frame is presented or the timeout is exceeded, then invokes
+/// callback.
+- (void)waitForFirstFrame:(NSTimeInterval)timeout callback:(void (^)(BOOL didTimeout))callback;
 
 /**
  * Creates one running FlutterEngine from another, sharing components between them.
@@ -49,6 +79,14 @@ NS_ASSUME_NONNULL_BEGIN
                            libraryURI:(nullable NSString*)libraryURI
                          initialRoute:(nullable NSString*)initialRoute
                        entrypointArgs:(nullable NSArray<NSString*>*)entrypointArgs;
+
+/**
+ * Dispatches the given key event data to the framework through the engine.
+ * The callback is called once the response from the framework is received.
+ */
+- (void)sendKeyEvent:(const FlutterKeyEvent&)event
+            callback:(nullable FlutterKeyEventCallback)callback
+            userData:(nullable void*)userData;
 
 @property(nonatomic, readonly) FlutterDartProject* project;
 
@@ -82,6 +120,9 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSObject<FlutterApplicationRegistrar>*)registrarForApplication:(NSString*)key;
 
+- (void)sendDeepLinkToFramework:(NSURL*)url completionHandler:(void (^)(BOOL success))completion;
+
+- (void)onStatusBarTap;
 @end
 
 @interface FlutterImplicitEngineBridgeImpl : NSObject <FlutterImplicitEngineBridge>

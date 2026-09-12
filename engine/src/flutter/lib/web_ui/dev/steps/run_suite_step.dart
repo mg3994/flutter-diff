@@ -8,6 +8,7 @@ import 'dart:io' as io;
 import 'package:path/path.dart' as pathlib;
 // TODO(yjbanov): remove hacks when this is fixed:
 //                https://github.com/dart-lang/test/issues/1521
+import 'package:skia_gold_client/skia_gold_client.dart';
 import 'package:test_api/backend.dart' as hack;
 import 'package:test_core/src/executable.dart' as test;
 import 'package:test_core/src/runner/hack_register_platform.dart' as hack;
@@ -31,6 +32,8 @@ class RunSuiteStep implements PipelineStep {
     this.suite, {
     required this.startPaused,
     required this.isVerbose,
+    required this.doUpdateScreenshotGoldens,
+    required this.requireSkiaGold,
     required this.overridePathToCanvasKit,
     required this.useDwarf,
     this.testFiles,
@@ -40,8 +43,12 @@ class RunSuiteStep implements PipelineStep {
   final Set<FilePath>? testFiles;
   final bool startPaused;
   final bool isVerbose;
+  final bool doUpdateScreenshotGoldens;
   final String? overridePathToCanvasKit;
   final bool useDwarf;
+
+  /// Require Skia Gold to be available and reachable.
+  final bool requireSkiaGold;
 
   @override
   String get description => 'run_suite';
@@ -62,6 +69,7 @@ class RunSuiteStep implements PipelineStep {
     );
     await browserEnvironment.prepare();
 
+    final SkiaGoldClient? skiaClient = await _createSkiaClient();
     final String configurationFilePath = pathlib.join(
       environment.webUiRootDir.path,
       browserEnvironment.packageTestConfigurationYamlFile,
@@ -87,6 +95,8 @@ class RunSuiteStep implements PipelineStep {
       return BrowserPlatform.start(
         suite,
         browserEnvironment: browserEnvironment,
+        doUpdateScreenshotGoldens: doUpdateScreenshotGoldens,
+        skiaClient: skiaClient,
         overridePathToCanvasKit: overridePathToCanvasKit,
         isVerbose: isVerbose,
       );
@@ -158,5 +168,88 @@ class RunSuiteStep implements PipelineStep {
       }
     });
     return testPaths;
+  }
+
+  Future<SkiaGoldClient?> _createSkiaClient() async {
+    if (suite.testBundle.compileConfigs.length > 1) {
+      // Multiple compile configs are only used for our fallback tests, which
+      // do not collect goldens.
+      print('Did not create SkiaGoldClient. Reason: Multiple compile configs.');
+      return null;
+    }
+    if (suite.runConfig.browser == BrowserName.safari) {
+      // Goldens from Safari produce too many diffs, disabled for now.
+      // See https://github.com/flutter/flutter/issues/143591
+      print('Did not create SkiaGoldClient. Reason: Safari browser.');
+      return null;
+    }
+
+    final Renderer renderer = suite.testBundle.compileConfigs.first.renderer;
+    final CanvasKitVariant? variant = suite.runConfig.variant;
+    final io.Directory workDirectory = getSkiaGoldDirectoryForSuite(suite);
+    if (workDirectory.existsSync()) {
+      workDirectory.deleteSync(recursive: true);
+    }
+    final isWasm = suite.testBundle.compileConfigs.first.compiler == Compiler.dart2wasm;
+    final bool singleThreaded =
+        suite.runConfig.forceSingleThreadedSkwasm || !suite.runConfig.crossOriginIsolated;
+    String rendererName = renderer.name;
+    if (renderer == Renderer.skwasm) {
+      if (suite.runConfig.enableWimp) {
+        rendererName = singleThreaded ? 'wimp_st' : 'wimp';
+      } else {
+        rendererName = singleThreaded ? 'skwasm_st' : 'skwasm';
+      }
+    }
+    final bool isWebParagraph = suite.runConfig.enableWebParagraph;
+
+    final dimensions = <String, String>{
+      'Browser': suite.runConfig.browser.name,
+      if (isWasm) 'Wasm': 'true',
+      'Renderer': rendererName,
+      'CanvasKitVariant': ?variant?.name,
+      if (isWebParagraph) 'WebParagraph': 'true',
+    };
+    final skiaClient = SkiaGoldClient(workDirectory, dimensions: dimensions);
+
+    final (bool success, String? reason) = await _checkSkiaClient(skiaClient);
+    if (success) {
+      print('Created SkiaGoldClient. Dimensions: $dimensions');
+      return skiaClient;
+    }
+
+    print('Did not create SkiaGoldClient. Reason: $reason.');
+    if (requireSkiaGold) {
+      throw ToolExit('Skia Gold is required but is unavailable.');
+    }
+
+    return null;
+  }
+
+  /// Checks whether the Skia Client is usable in this environment.
+  Future<(bool, String?)> _checkSkiaClient(SkiaGoldClient skiaClient) async {
+    // Now let's check whether Skia Gold is reachable or not.
+    if (isLuci) {
+      if (SkiaGoldClient.isAvailable()) {
+        try {
+          await skiaClient.auth();
+          return (true, null);
+        } catch (e) {
+          print(e);
+        }
+      }
+    } else {
+      try {
+        // Check if we can reach Gold.
+        await skiaClient.getExpectationForTest('');
+        return (true, null);
+      } on io.OSError catch (_) {
+        return (false, 'OSError occurred, could not reach Gold');
+      } on io.SocketException catch (_) {
+        return (false, 'SocketException occurred, could not reach Gold');
+      }
+    }
+
+    return (false, 'Unknown');
   }
 }

@@ -17,8 +17,11 @@ secondary_source = "//flutter/build/secondary/"
 # this.
 check_targets = [
   "//flutter/common/*",
+  "//flutter/display_list/*",
+  "//flutter/flow/*",
   "//flutter/fml/*",
   "//flutter/lib/*",
+  "//flutter/impeller/*",
   "//flutter/runtime/*",
   "//flutter/shell/*",
 ]

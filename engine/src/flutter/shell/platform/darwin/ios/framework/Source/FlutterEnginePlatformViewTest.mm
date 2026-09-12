@@ -10,8 +10,8 @@
 
 #include "flutter/fml/message_loop.h"
 #import "flutter/shell/platform/darwin/common/framework/Headers/FlutterMacros.h"
+#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine+Test.h"
 #import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine_Internal.h"
-#import "flutter/shell/platform/darwin/ios/framework/Source/FlutterEngine_Test.h"
 #import "flutter/shell/platform/darwin/ios/platform_view_ios.h"
 
 FLUTTER_ASSERT_ARC
@@ -21,10 +21,33 @@ namespace {
 
 class FakeDelegate : public PlatformView::Delegate {
  public:
-  void OnPlatformViewCreated() override {}
+  void OnPlatformViewCreated(std::unique_ptr<Surface> surface) override {}
   void OnPlatformViewDestroyed() override {}
+  void OnPlatformViewScheduleFrame() override {}
+  void OnPlatformViewAddView(int64_t view_id,
+                             const ViewportMetrics& viewport_metrics,
+                             AddViewCallback callback) override {}
+  void OnPlatformViewRemoveView(int64_t view_id, RemoveViewCallback callback) override {}
+  void OnPlatformViewSendViewFocusEvent(const ViewFocusEvent& event) override {}
+  void OnPlatformViewSetNextFrameCallback(const fml::closure& closure) override {}
+  void OnPlatformViewSetViewportMetrics(int64_t view_id, const ViewportMetrics& metrics) override {}
   const flutter::Settings& OnPlatformViewGetSettings() const override { return settings_; }
   void OnPlatformViewDispatchPlatformMessage(std::unique_ptr<PlatformMessage> message) override {}
+  void OnPlatformViewDispatchPointerDataPacket(std::unique_ptr<PointerDataPacket> packet) override {
+  }
+  HitTestResponse OnPlatformViewHitTest(int64_t view_id, const flutter::PointData offset) override {
+    return {.has_platform_view = false};
+  }
+  void OnPlatformViewDispatchSemanticsAction(int64_t view_id,
+                                             int32_t node_id,
+                                             SemanticsAction action,
+                                             fml::MallocMapping args) override {}
+  void OnPlatformViewSetSemanticsEnabled(bool enabled) override {}
+  void OnPlatformViewSetAccessibilityFeatures(int32_t flags) override {}
+  void OnPlatformViewRegisterTexture(std::shared_ptr<Texture> texture) override {}
+  void OnPlatformViewUnregisterTexture(int64_t texture_id) override {}
+  void OnPlatformViewMarkTextureFrameAvailable(int64_t texture_id) override {}
+
   void LoadDartDeferredLibrary(intptr_t loading_unit_id,
                                std::unique_ptr<const fml::Mapping> snapshot_data,
                                std::unique_ptr<const fml::Mapping> snapshot_instructions) override {
@@ -34,6 +57,9 @@ class FakeDelegate : public PlatformView::Delegate {
                                     bool transient) override {}
   void UpdateAssetResolverByType(std::unique_ptr<AssetResolver> updated_asset_resolver,
                                  AssetResolver::AssetResolverType type) override {}
+  std::shared_ptr<fml::BasicTaskRunner> OnPlatformViewGetShutdownSafeIOTaskRunner() const override {
+    return nullptr;
+  }
 
   flutter::Settings settings_;
 };
@@ -52,12 +78,18 @@ flutter::FakeDelegate fake_delegate;
 - (void)setUp {
   fml::MessageLoop::EnsureInitializedForCurrentThread();
   auto thread_task_runner = fml::MessageLoop::GetCurrent().GetTaskRunner();
+  auto sync_switch = std::make_shared<fml::SyncSwitch>();
   flutter::TaskRunners runners(/*label=*/self.name.UTF8String,
                                /*platform=*/thread_task_runner,
-                               /*ui=*/thread_task_runner);
+                               /*raster=*/thread_task_runner,
+                               /*ui=*/thread_task_runner,
+                               /*io=*/thread_task_runner);
   platform_view = std::make_unique<flutter::PlatformViewIOS>(
       /*delegate=*/fake_delegate,
-      /*task_runners=*/runners);
+      /*rendering_api=*/flutter::IOSRenderingAPI::kMetal,
+      /*platform_views_controller=*/nil,
+      /*task_runners=*/runners,
+      /*is_gpu_disabled_sync_switch=*/sync_switch);
   weak_factory = std::make_unique<fml::WeakPtrFactory<flutter::PlatformView>>(platform_view.get());
 }
 
@@ -77,6 +109,8 @@ flutter::FakeDelegate fake_delegate;
   OCMStub([mockEngine notifyLowMemory]);
   OCMStub([mockEngine platformView]).andReturn(platform_view.get());
 
+  [engine setViewController:nil];
+  OCMVerify([mockEngine notifyLowMemory]);
   OCMReject([mockEngine notifyLowMemory]);
 
   XCTNSNotificationExpectation* memoryExpectation = [[XCTNSNotificationExpectation alloc]
@@ -85,8 +119,6 @@ flutter::FakeDelegate fake_delegate;
       postNotificationName:UIApplicationDidReceiveMemoryWarningNotification
                     object:nil];
   [self waitForExpectations:@[ memoryExpectation ] timeout:5.0];
-  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:1.0]];
-
   OCMVerify([mockEngine notifyLowMemory]);
   OCMReject([mockEngine notifyLowMemory]);
 

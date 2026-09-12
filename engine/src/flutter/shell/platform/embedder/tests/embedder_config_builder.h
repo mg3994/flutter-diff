@@ -9,6 +9,7 @@
 #include "flutter/fml/unique_object.h"
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/embedder/tests/embedder_test.h"
+#include "flutter/shell/platform/embedder/tests/embedder_test_context_software.h"
 
 namespace flutter::testing {
 
@@ -51,10 +52,14 @@ class EmbedderConfigBuilder {
 
   void SetIsolateCreateCallbackHook();
 
+  void SetSemanticsCallbackHooks();
+
   // Used to set a custom log message handler.
   void SetLogMessageCallbackHook();
 
   void SetChannelUpdateCallbackHook();
+
+  void SetViewFocusChangeRequestHook();
 
   // Used to set a custom log tag.
   void SetLogTag(std::string tag);
@@ -73,18 +78,44 @@ class EmbedderConfigBuilder {
 
   void SetUITaskRunner(const FlutterTaskRunnerDescription* runner);
 
+  void SetRenderTaskRunner(const FlutterTaskRunnerDescription* runner);
+
   void SetPlatformMessageCallback(
       const std::function<void(const FlutterPlatformMessage*)>& callback);
+
+  void SetViewFocusChangeRequestCallback(
+      const std::function<void(const FlutterViewFocusChangeRequest*)>&
+          callback);
+
+  void SetCompositor(bool avoid_backing_store_cache = false,
+                     bool use_present_layers_callback = false);
+
+  FlutterCompositor& GetCompositor();
+
+  void SetSurface(DlISize surface_size) { context_.SetSurface(surface_size); }
+
+  void SetRenderTargetType(
+      EmbedderTestBackingStoreProducer::RenderTargetType type,
+      FlutterSoftwarePixelFormat software_pixfmt =
+          kFlutterSoftwarePixelFormatNative32);
 
   UniqueEngine LaunchEngine() const;
 
   UniqueEngine InitializeEngine() const;
+
+  // Sets up the callback for vsync, the callbacks needs to be specified on the
+  // text context vis `SetVsyncCallback`.
+  void SetupVsyncCallback();
+
+  void SetViewFocusChangeRequestCallback(
+      const FlutterViewFocusChangeRequestCallback& callback);
 
  private:
   EmbedderTestContext& context_;
   FlutterProjectArgs project_args_ = {};
   std::string dart_entrypoint_;
   FlutterCustomTaskRunners custom_task_runners_ = {};
+  FlutterCompositor compositor_ = {};
   std::vector<std::string> command_line_arguments_;
   std::vector<std::string> dart_entrypoint_arguments_;
   std::string log_tag_;

@@ -23,7 +23,6 @@ import 'base/utils.dart';
 import 'build_info.dart';
 import 'bundle.dart';
 import 'convert.dart';
-import 'dart/package_map.dart';
 
 /// Opt-in changes to the dart compilers.
 const kDartCompilerExperiments = <String>[];
@@ -292,7 +291,7 @@ class KernelCompiler {
       final File mainFile = _fileSystem.file(mainPath);
       final Uri mainFileUri = mainFile.uri;
       if (packagesPath != null) {
-        mainUri = packageConfig.toPackageUriForWorkspace(mainFileUri)?.toString();
+        mainUri = packageConfig.toPackageUri(mainFileUri)?.toString();
       }
       mainUri ??= toMultiRootPath(
         mainFileUri,
@@ -315,7 +314,7 @@ class KernelCompiler {
     if (dartPluginRegistrant != null && dartPluginRegistrant.existsSync()) {
       final Uri dartPluginRegistrantFileUri = dartPluginRegistrant.uri;
       dartPluginRegistrantUri =
-          packageConfig.toPackageUriForWorkspace(dartPluginRegistrantFileUri)?.toString() ??
+          packageConfig.toPackageUri(dartPluginRegistrantFileUri)?.toString() ??
           toMultiRootPath(
             dartPluginRegistrantFileUri,
             _fileSystemScheme,
@@ -854,15 +853,13 @@ class DefaultResidentCompiler implements ResidentCompiler {
     _stdoutHandler._suppressCompilerMessages = request.suppressErrors;
 
     final String mainUri =
-        request.packageConfig.toPackageUriForWorkspace(request.mainUri)?.toString() ??
+        request.packageConfig.toPackageUri(request.mainUri)?.toString() ??
         toMultiRootPath(request.mainUri, fileSystemScheme, fileSystemRoots, _platform.isWindows);
 
     String? additionalSourceUri;
     if (request.additionalSourceUri != null) {
       additionalSourceUri =
-          request.packageConfig
-              .toPackageUriForWorkspace(request.additionalSourceUri!)
-              ?.toString() ??
+          request.packageConfig.toPackageUri(request.additionalSourceUri!)?.toString() ??
           toMultiRootPath(
             request.additionalSourceUri!,
             fileSystemScheme,
@@ -901,7 +898,7 @@ class DefaultResidentCompiler implements ResidentCompiler {
           message = fileUri.toString();
         } else {
           message =
-              request.packageConfig.toPackageUriForWorkspace(fileUri)?.toString() ??
+              request.packageConfig.toPackageUri(fileUri)?.toString() ??
               toMultiRootPath(fileUri, fileSystemScheme, fileSystemRoots, _platform.isWindows);
         }
         server.stdin.writeln(message);

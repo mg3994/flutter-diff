@@ -14,7 +14,11 @@ class DartPersistentHandleTest : public FixtureTest {
       : settings_(CreateSettingsForFixture()),
         vm_(DartVMRef::Create(settings_)),
         thread_(CreateNewThread()),
-        task_runners_(GetCurrentTestName(), thread_, thread_) {}
+        task_runners_(GetCurrentTestName(),
+                      thread_,
+                      thread_,
+                      thread_,
+                      thread_) {}
 
   ~DartPersistentHandleTest() = default;
 

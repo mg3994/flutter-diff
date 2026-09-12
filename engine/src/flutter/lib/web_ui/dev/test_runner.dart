@@ -74,6 +74,12 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
       ..addFlag('gcs-try', help: 'Use artifacts from the try gcs bucket populated by CI.')
       ..addFlag('dwarf', help: 'Debug wasm modules using embedded DWARF data.')
       ..addFlag(
+        'require-skia-gold',
+        help:
+            'Whether we require Skia Gold to be available or not. When this '
+            'flag is true, the tests will fail if Skia Gold is not available.',
+      )
+      ..addFlag(
         'update-screenshot-goldens',
         help:
             'When running screenshot tests writes them to the file system into '
@@ -127,6 +133,14 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
   /// The target test files to run.
   List<FilePath> get targetFiles =>
       argResults!.rest.map((String t) => FilePath.fromCwd(t)).toList();
+
+  /// When running screenshot tests, require Skia Gold to be available and
+  /// reachable.
+  bool get requireSkiaGold => boolArg('require-skia-gold');
+
+  /// When running screenshot tests writes them to the file system into
+  /// ".dart_tool/goldens".
+  bool get doUpdateScreenshotGoldens => boolArg('update-screenshot-goldens');
 
   /// Path to a CanvasKit build. Overrides the default CanvasKit.
   String? get overridePathToCanvasKit => argResults!['canvaskit-path'] as String?;
@@ -337,8 +351,8 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
         print('  ${bundle.name.ansiMagenta}');
       }
       print('Artifacts:');
-      if (artifacts.canvasKitExperimentalWebParagraph) {
-        print('  canvaskit_experimental_webparagraph'.ansiYellow);
+      if (artifacts.canvasKitWebParagraph) {
+        print('  canvaskit_webparagraph'.ansiYellow);
       }
       if (artifacts.canvasKit) {
         print('  canvaskit'.ansiYellow);
@@ -378,6 +392,8 @@ class TestCommand extends Command<bool> with ArgUtils<bool> {
               suite,
               startPaused: startPaused,
               isVerbose: isVerbose,
+              doUpdateScreenshotGoldens: doUpdateScreenshotGoldens,
+              requireSkiaGold: requireSkiaGold,
               overridePathToCanvasKit: overridePathToCanvasKit,
               testFiles: testFiles,
               useDwarf: boolArg('dwarf'),

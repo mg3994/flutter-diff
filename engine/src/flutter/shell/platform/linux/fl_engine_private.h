@@ -8,7 +8,13 @@
 #include <glib-object.h>
 
 #include "flutter/shell/platform/embedder/embedder.h"
+#include "flutter/shell/platform/linux/fl_display_monitor.h"
+#include "flutter/shell/platform/linux/fl_keyboard_manager.h"
+#include "flutter/shell/platform/linux/fl_mouse_cursor_handler.h"
+#include "flutter/shell/platform/linux/fl_opengl_manager.h"
+#include "flutter/shell/platform/linux/fl_renderable.h"
 #include "flutter/shell/platform/linux/fl_task_runner.h"
+#include "flutter/shell/platform/linux/fl_text_input_handler.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_dart_project.h"
 #include "flutter/shell/platform/linux/public/flutter_linux/fl_engine.h"
 
@@ -56,6 +62,50 @@ FlEngine* fl_engine_new_with_binary_messenger(
     FlBinaryMessenger* binary_messenger);
 
 /**
+ * fl_engine_get_renderer_type:
+ * @engine: an #FlEngine.
+ *
+ * Gets the rendering type used by this engine.
+ *
+ * Returns: type of rendering used.
+ */
+FlutterRendererType fl_engine_get_renderer_type(FlEngine* engine);
+
+/**
+ * fl_engine_get_opengl_manager:
+ * @engine: an #FlEngine.
+ *
+ * Gets the OpenGL manager used by this engine.
+ *
+ * Returns: an #FlOpenGLManager.
+ */
+FlOpenGLManager* fl_engine_get_opengl_manager(FlEngine* engine);
+
+/**
+ * fl_engine_get_display_monitor:
+ * @engine: an #FlEngine.
+ *
+ * Gets the display monitor used by this engine.
+ *
+ * Returns: an #FlDisplayMonitor.
+ */
+FlDisplayMonitor* fl_engine_get_display_monitor(FlEngine* engine);
+
+/**
+ * fl_engine_start:
+ * @engine: an #FlEngine.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL
+ * to ignore. If `error` is not %NULL, `*error` must be initialized (typically
+ * %NULL, but an error from a previous call using GLib error handling is
+ * explicitly valid).
+ *
+ * Starts the Flutter engine.
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean fl_engine_start(FlEngine* engine, GError** error);
+
+/**
  * fl_engine_get_embedder_api:
  * @engine: an #FlEngine.
  *
@@ -64,6 +114,120 @@ FlEngine* fl_engine_new_with_binary_messenger(
  * Returns: a mutable pointer to the embedder API proc table.
  */
 FlutterEngineProcTable* fl_engine_get_embedder_api(FlEngine* engine);
+
+/**
+ * fl_engine_notify_display_update:
+ * @engine: an #FlEngine.
+ * @displays: displays present on the system.
+ * @displays_length: length of @displays.
+ *
+ * Notify the current displays that are in the system.
+ */
+void fl_engine_notify_display_update(FlEngine* engine,
+                                     const FlutterEngineDisplay* displays,
+                                     size_t displays_length);
+
+/**
+ * fl_engine_set_implicit_view:
+ * @engine: an #FlEngine.
+ * @renderable: the object that will render the implicit view.
+ *
+ * Sets the object to render the implicit view.
+ */
+void fl_engine_set_implicit_view(FlEngine* engine, FlRenderable* renderable);
+
+/**
+ * fl_engine_add_view:
+ * @engine: an #FlEngine.
+ * @renderable: the object that will render this view.
+ * @min_width: minimum width of view in pixels.
+ * @min_height: minimum height of view in pixels.
+ * @max_width: maximum width of view in pixels.
+ * @max_height: maximum height of view in pixels.
+ * @pixel_ratio: scale factor for view.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): a #GAsyncReadyCallback to call when the view is
+ * added.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ * Asynchronously add a new view. The returned view ID should not be used until
+ * this function completes.
+ *
+ * Returns: the ID for the view.
+ */
+FlutterViewId fl_engine_add_view(FlEngine* engine,
+                                 FlRenderable* renderable,
+                                 size_t min_width,
+                                 size_t min_height,
+                                 size_t max_width,
+                                 size_t max_height,
+                                 double pixel_ratio,
+                                 GCancellable* cancellable,
+                                 GAsyncReadyCallback callback,
+                                 gpointer user_data);
+
+/**
+ * fl_engine_add_view_finish:
+ * @engine: an #FlEngine.
+ * @result: a #GAsyncResult.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL
+ * to ignore. If `error` is not %NULL, `*error` must be initialized (typically
+ * %NULL, but an error from a previous call using GLib error handling is
+ * explicitly valid).
+ *
+ * Completes request started with fl_engine_add_view().
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean fl_engine_add_view_finish(FlEngine* engine,
+                                   GAsyncResult* result,
+                                   GError** error);
+
+/**
+ * fl_engine_get_renderable:
+ * @engine: an #FlEngine.
+ * @view_id: ID to check.
+ *
+ * Gets the renderable associated with the give view ID.
+ *
+ * Returns: (transfer full): a reference to an #FlRenderable or %NULL if none
+ * for this ID.
+ */
+FlRenderable* fl_engine_get_renderable(FlEngine* engine, FlutterViewId view_id);
+
+/**
+ * fl_engine_remove_view:
+ * @engine: an #FlEngine.
+ * @view_id: ID to remove.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): a #GAsyncReadyCallback to call when the view is
+ * added.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ * Removes a view previously added with fl_engine_add_view().
+ */
+void fl_engine_remove_view(FlEngine* engine,
+                           FlutterViewId view_id,
+                           GCancellable* cancellable,
+                           GAsyncReadyCallback callback,
+                           gpointer user_data);
+
+/**
+ * fl_engine_remove_view_finish:
+ * @engine: an #FlEngine.
+ * @result: a #GAsyncResult.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL
+ * to ignore. If `error` is not %NULL, `*error` must be initialized (typically
+ * %NULL, but an error from a previous call using GLib error handling is
+ * explicitly valid).
+ *
+ * Completes request started with fl_engine_remove_view().
+ *
+ * Returns: %TRUE on succcess.
+ */
+gboolean fl_engine_remove_view_finish(FlEngine* engine,
+                                      GAsyncResult* result,
+                                      GError** error);
 
 /**
  * fl_engine_set_platform_message_handler:
@@ -84,6 +248,223 @@ void fl_engine_set_platform_message_handler(
     FlEnginePlatformMessageHandler handler,
     gpointer user_data,
     GDestroyNotify destroy_notify);
+
+/**
+ * fl_engine_send_window_metrics_event:
+ * @engine: an #FlEngine.
+ * @display_id: the display this view is rendering on.
+ * @view_id: the view that the event occured on.
+ * @min_width: minimum width of view in pixels.
+ * @min_height: minimum height of view in pixels.
+ * @max_width: maximum width of view in pixels.
+ * @max_height: maximum height of view in pixels.
+ * @pixel_ratio: scale factor for view.
+ *
+ * Sends a window metrics event to the engine.
+ */
+void fl_engine_send_window_metrics_event(FlEngine* engine,
+                                         FlutterEngineDisplayId display_id,
+                                         FlutterViewId view_id,
+                                         size_t min_width,
+                                         size_t min_height,
+                                         size_t max_width,
+                                         size_t max_height,
+                                         double pixel_ratio);
+
+/**
+ * fl_engine_send_mouse_pointer_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @phase: mouse phase.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @device_kind: kind of pointing device.
+ * @scroll_delta_x: x offset of scroll.
+ * @scroll_delta_y: y offset of scroll.
+ * @buttons: buttons that are pressed.
+ * @rotation: rotation of the pointer device in degrees.
+ * @pressure: pressure of the pointer device.
+ *
+ * Sends a mouse pointer event to the engine.
+ */
+void fl_engine_send_mouse_pointer_event(FlEngine* engine,
+                                        FlutterViewId view_id,
+                                        FlutterPointerPhase phase,
+                                        size_t timestamp,
+                                        double x,
+                                        double y,
+                                        FlutterPointerDeviceKind device_kind,
+                                        double scroll_delta_x,
+                                        double scroll_delta_y,
+                                        int64_t buttons,
+                                        double rotation,
+                                        double pressure);
+
+/**
+ * fl_engine_send_touch_up_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @device: device id.
+ *
+ * Sends a touch up event to the engine.
+ */
+void fl_engine_send_touch_up_event(FlEngine* engine,
+                                   FlutterViewId view_id,
+                                   size_t timestamp,
+                                   double x,
+                                   double y,
+                                   int32_t device);
+
+/**
+ * fl_engine_send_touch_down_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @device: device id.
+ *
+ * Sends a touch down event to the engine.
+ */
+void fl_engine_send_touch_down_event(FlEngine* engine,
+                                     FlutterViewId view_id,
+                                     size_t timestamp,
+                                     double x,
+                                     double y,
+                                     int32_t device);
+/**
+ * fl_engine_send_touch_move_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @device: device id.
+ *
+ * Sends a touch move event to the engine.
+ */
+void fl_engine_send_touch_move_event(FlEngine* engine,
+                                     FlutterViewId view_id,
+                                     size_t timestamp,
+                                     double x,
+                                     double y,
+                                     int32_t device);
+
+/**
+ * fl_engine_send_touch_add_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @device: device id.
+ *
+ * Sends a touch add event to the engine.
+ */
+void fl_engine_send_touch_add_event(FlEngine* engine,
+                                    FlutterViewId view_id,
+                                    size_t timestamp,
+                                    double x,
+                                    double y,
+                                    int32_t device);
+
+/**
+ * fl_engine_send_touch_remove_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @device: device id.
+ *
+ * Sends a touch remove event to the engine.
+ */
+void fl_engine_send_touch_remove_event(FlEngine* engine,
+                                       FlutterViewId view_id,
+                                       size_t timestamp,
+                                       double x,
+                                       double y,
+                                       int32_t device);
+
+/**
+ * fl_engine_send_pointer_pan_zoom_event:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @timestamp: time when event occurred in microseconds.
+ * @x: x location of mouse cursor.
+ * @y: y location of mouse cursor.
+ * @phase: mouse phase.
+ * @pan_x: x offset of the pan/zoom in pixels.
+ * @pan_y: y offset of the pan/zoom in pixels.
+ * @scale: scale of the pan/zoom.
+ * @rotation: rotation of the pan/zoom in radians.
+ *
+ * Sends a pan/zoom pointer event to the engine.
+ */
+void fl_engine_send_pointer_pan_zoom_event(FlEngine* engine,
+                                           FlutterViewId view_id,
+                                           size_t timestamp,
+                                           double x,
+                                           double y,
+                                           FlutterPointerPhase phase,
+                                           double pan_x,
+                                           double pan_y,
+                                           double scale,
+                                           double rotation);
+
+/**
+ * fl_engine_send_key_event:
+ * @engine: an #FlEngine.
+ * @event: key event to send.
+ * @cancellable: (allow-none): a #GCancellable or %NULL.
+ * @callback: (scope async): a #GAsyncReadyCallback to call when the request is
+ * satisfied.
+ * @user_data: (closure): user data to pass to @callback.
+ *
+ * Send a key event to the engine.
+ */
+void fl_engine_send_key_event(FlEngine* engine,
+                              const FlutterKeyEvent* event,
+                              GCancellable* cancellable,
+                              GAsyncReadyCallback callback,
+                              gpointer user_data);
+
+/**
+ * fl_engine_send_key_event_finish:
+ * @engine: an #FlEngine.
+ * @result: a #GAsyncResult.
+ * @handled: location to write if this event was handled by the engine.
+ * @error: (allow-none): #GError location to store the error occurring, or %NULL
+ * to ignore. If `error` is not %NULL, `*error` must be initialized (typically
+ * %NULL, but an error from a previous call using GLib error handling is
+ * explicitly valid).
+ *
+ * Completes request started with fl_engine_send_key_event().
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean fl_engine_send_key_event_finish(FlEngine* engine,
+                                         GAsyncResult* result,
+                                         gboolean* handled,
+                                         GError** error);
+
+/**
+ * fl_engine_dispatch_semantics_action:
+ * @engine: an #FlEngine.
+ * @view_id: the view that the event occured on.
+ * @node_id: the semantics action identifier.
+ * @action: the action being dispatched.
+ * @data: (allow-none): data associated with the action.
+ */
+void fl_engine_dispatch_semantics_action(FlEngine* engine,
+                                         FlutterViewId view_id,
+                                         uint64_t node_id,
+                                         FlutterSemanticsAction action,
+                                         GBytes* data);
 
 /**
  * fl_engine_send_platform_message_response:
@@ -158,6 +539,91 @@ FlTaskRunner* fl_engine_get_task_runner(FlEngine* engine);
  * Executes given Flutter task.
  */
 void fl_engine_execute_task(FlEngine* engine, FlutterTask* task);
+
+/**
+ * fl_engine_mark_texture_frame_available:
+ * @engine: an #FlEngine.
+ * @texture_id: the identifier of the texture whose frame has been updated.
+ *
+ * Tells the Flutter engine that a new texture frame is available for the given
+ * texture.
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean fl_engine_mark_texture_frame_available(FlEngine* engine,
+                                                int64_t texture_id);
+
+/**
+ * fl_engine_register_external_texture:
+ * @engine: an #FlEngine.
+ * @texture_id: the identifier of the texture that is available.
+ *
+ * Tells the Flutter engine that a new external texture is available.
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean fl_engine_register_external_texture(FlEngine* engine,
+                                             int64_t texture_id);
+
+/**
+ * fl_engine_unregister_external_texture:
+ * @engine: an #FlEngine.
+ * @texture_id: the identifier of the texture that is not available anymore.
+ *
+ * Tells the Flutter engine that an existing external texture is not available
+ * anymore.
+ *
+ * Returns: %TRUE on success.
+ */
+gboolean fl_engine_unregister_external_texture(FlEngine* engine,
+                                               int64_t texture_id);
+
+/**
+ * fl_engine_update_accessibility_features:
+ * @engine: an #FlEngine.
+ * @flags: the features to enable in the accessibility tree.
+ *
+ * Tells the Flutter engine to update the flags on the accessibility tree.
+ */
+void fl_engine_update_accessibility_features(FlEngine* engine, int32_t flags);
+
+/**
+ * fl_engine_request_app_exit:
+ * @engine: an #FlEngine.
+ *
+ * Request the application exits.
+ */
+void fl_engine_request_app_exit(FlEngine* engine);
+
+/**
+ * fl_engine_get_keyboard_manager:
+ * @engine: an #FlEngine.
+ *
+ * Gets the keyboard manager used by this engine.
+ *
+ * Returns: an #FlKeyboardManager.
+ */
+FlKeyboardManager* fl_engine_get_keyboard_manager(FlEngine* engine);
+
+/**
+ * fl_engine_get_text_input_handler:
+ * @engine: an #FlEngine.
+ *
+ * Gets the text input handler used by this engine.
+ *
+ * Returns: an #FlTextInputHandler.
+ */
+FlTextInputHandler* fl_engine_get_text_input_handler(FlEngine* engine);
+
+/**
+ * fl_engine_get_mouse_cursor_handler:
+ * @engine: an #FlEngine.
+ *
+ * Gets the mouse cursor handler used by this engine.
+ *
+ * Returns: an #FlMouseCursorHandler.
+ */
+FlMouseCursorHandler* fl_engine_get_mouse_cursor_handler(FlEngine* engine);
 
 /**
  * fl_engine_for_id:

@@ -20,7 +20,7 @@ void main() {
 
   test('UI isolate API throws in a background isolate', () async {
     void callUiApi(void message) {
-      PlatformDispatcher.instance.requestDartPerformanceMode(DartPerformanceMode.balanced);
+      PlatformDispatcher.instance.onReportTimings = (_) {};
     }
 
     final errorPort = ReceivePort();

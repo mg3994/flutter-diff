@@ -4,7 +4,6 @@
 
 #include "flutter/testing/dart_isolate_runner.h"
 #include "flutter/testing/fixture_test.h"
-#include "tonic/dart_weak_persistent_value.h"
 
 namespace flutter {
 namespace testing {
@@ -27,7 +26,7 @@ class DartWeakPersistentHandle : public FixtureTest {
     }
     auto thread = CreateNewThread();
     TaskRunners single_threaded_task_runner(GetCurrentTestName(), thread,
-                                            thread);
+                                            thread, thread, thread);
     auto isolate =
         RunDartCodeInIsolate(vm_, settings_, single_threaded_task_runner,
                              entrypoint, {}, GetDefaultKernelFilePath());

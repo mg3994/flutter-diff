@@ -21,6 +21,9 @@ struct _FlPluginRegistrarImpl {
 
   // Messenger to communicate on.
   FlBinaryMessenger* messenger;
+
+  // Texture registrar in use.
+  FlTextureRegistrar* texture_registrar;
 };
 
 static void fl_plugin_registrar_impl_iface_init(
@@ -43,6 +46,7 @@ static void fl_plugin_registrar_impl_dispose(GObject* object) {
 
   g_weak_ref_clear(&self->view);
   g_clear_object(&self->messenger);
+  g_clear_object(&self->texture_registrar);
 
   G_OBJECT_CLASS(fl_plugin_registrar_impl_parent_class)->dispose(object);
 }
@@ -57,21 +61,44 @@ static FlBinaryMessenger* get_messenger(FlPluginRegistrar* registrar) {
   return self->messenger;
 }
 
+static FlTextureRegistrar* get_texture_registrar(FlPluginRegistrar* registrar) {
+  FlPluginRegistrarImpl* self = FL_PLUGIN_REGISTRAR_IMPL(registrar);
+  return self->texture_registrar;
+}
+
+static FlView* get_view(FlPluginRegistrar* registrar) {
+  FlPluginRegistrarImpl* self = FL_PLUGIN_REGISTRAR_IMPL(registrar);
+  g_autoptr(FlView) view = FL_VIEW(g_weak_ref_get(&self->view));
+  return view;
+}
+
 static void fl_plugin_registrar_impl_iface_init(
     FlPluginRegistrarInterface* iface) {
   iface->get_messenger = get_messenger;
+  iface->get_texture_registrar = get_texture_registrar;
+  iface->get_view = get_view;
 }
 
 static void fl_plugin_registrar_impl_init(FlPluginRegistrarImpl* self) {}
 
-FlPluginRegistrar* fl_plugin_registrar_new(FlBinaryMessenger* messenger) {
+FlPluginRegistrar* fl_plugin_registrar_new(
+    FlView* view,
+    FlBinaryMessenger* messenger,
+    FlTextureRegistrar* texture_registrar) {
+  g_return_val_if_fail(view == nullptr || FL_IS_VIEW(view), nullptr);
   g_return_val_if_fail(FL_IS_BINARY_MESSENGER(messenger), nullptr);
+  g_return_val_if_fail(FL_IS_TEXTURE_REGISTRAR(texture_registrar), nullptr);
 
   FlPluginRegistrarImpl* self = FL_PLUGIN_REGISTRAR_IMPL(
       g_object_new(fl_plugin_registrar_impl_get_type(), nullptr));
 
   // Added to stop compiler complaining about an unused function.
   FL_IS_PLUGIN_REGISTRAR_IMPL(self);
+
+  g_weak_ref_init(&self->view, view);
+  self->messenger = FL_BINARY_MESSENGER(g_object_ref(messenger));
+  self->texture_registrar =
+      FL_TEXTURE_REGISTRAR(g_object_ref(texture_registrar));
 
   return FL_PLUGIN_REGISTRAR(self);
 }
@@ -81,4 +108,17 @@ G_MODULE_EXPORT FlBinaryMessenger* fl_plugin_registrar_get_messenger(
   g_return_val_if_fail(FL_IS_PLUGIN_REGISTRAR(self), nullptr);
 
   return FL_PLUGIN_REGISTRAR_GET_IFACE(self)->get_messenger(self);
+}
+
+G_MODULE_EXPORT FlTextureRegistrar* fl_plugin_registrar_get_texture_registrar(
+    FlPluginRegistrar* self) {
+  g_return_val_if_fail(FL_IS_PLUGIN_REGISTRAR(self), nullptr);
+
+  return FL_PLUGIN_REGISTRAR_GET_IFACE(self)->get_texture_registrar(self);
+}
+
+G_MODULE_EXPORT FlView* fl_plugin_registrar_get_view(FlPluginRegistrar* self) {
+  g_return_val_if_fail(FL_IS_PLUGIN_REGISTRAR(self), nullptr);
+
+  return FL_PLUGIN_REGISTRAR_GET_IFACE(self)->get_view(self);
 }

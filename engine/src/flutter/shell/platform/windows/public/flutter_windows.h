@@ -20,12 +20,66 @@ extern "C" {
 
 typedef void (*VoidCallback)(void* /* user data */);
 
+// Opaque reference to a Flutter view controller.
+struct FlutterDesktopViewController;
+typedef struct FlutterDesktopViewController* FlutterDesktopViewControllerRef;
+
+// Opaque reference to a Flutter window.
+struct FlutterDesktopView;
+typedef struct FlutterDesktopView* FlutterDesktopViewRef;
+
 // Opaque reference to a Flutter engine instance.
 struct FlutterDesktopEngine;
 typedef struct FlutterDesktopEngine* FlutterDesktopEngineRef;
 
 // The unique identifier for a view.
 typedef int64_t FlutterDesktopViewId;
+
+// Configures how the Flutter engine selects a GPU.
+typedef enum {
+  // No preference.
+  NoPreference,
+  // Prefer energy efficiency over performance, such as an integrated GPU.
+  // This falls back to a high performance GPU if no low power GPU is
+  // available.
+  LowPowerPreference,
+  // Prefer performance over energy efficiency, such as a discrete GPU or
+  // dedicated GPU.
+  // This falls back to a low power GPU if no high performance GPU is available.
+  HighPerformancePreference,
+} FlutterDesktopGpuPreference;
+
+// Configures the thread policy for running the UI isolate.
+typedef enum {
+  // Default value. Currently will run the UI isolate on separate thread,
+  // later will be changed to running the UI isolate on platform thread.
+  Default,
+  // Run the UI isolate on platform thread.
+  RunOnPlatformThread,
+  // Run the UI isolate on a separate thread.
+  RunOnSeparateThread,
+} FlutterDesktopUIThreadPolicy;
+
+// Configures the accessibility implementation used by Flutter.
+typedef enum {
+  // Default value. Flutter will automatically select the best available
+  // implementation.
+  DefaultAccessibilityMode,
+  // Use the IAccessible implementation.
+  IAccessibleMode,
+  // Use the experimental IAccessibleEx implementation.
+  IAccessibleExMode,
+} FlutterDesktopAccessibilityMode;
+
+// Configures the Impeller enablement switch.
+typedef enum {
+  // Use the default Impeller enablement behavior.
+  DefaultImpeller,
+  // Enable Impeller.
+  EnabledImpeller,
+  // Disable Impeller.
+  DisabledImpeller,
+} FlutterDesktopImpellerSwitch;
 
 // Properties for configuring a Flutter engine instance.
 typedef struct {
@@ -59,7 +113,83 @@ typedef struct {
   // Array of Dart entrypoint arguments. This is deep copied during the call
   // to FlutterDesktopEngineCreate.
   const char** dart_entrypoint_argv;
+
+  // GPU choice preference
+  // If not set defaults to NoPreference;
+  FlutterDesktopGpuPreference gpu_preference;
+
+  // Policy for the thread that runs UI isolate.
+  // If not set defaults to Default;
+  FlutterDesktopUIThreadPolicy ui_thread_policy;
+
+  // The accessibility mode.
+  // This can be used to enable the experimental IAccessibleEx implementation.
+  FlutterDesktopAccessibilityMode accessibility_mode;
+
+  // Policy for enabling the Impeller renderer.
+  FlutterDesktopImpellerSwitch impeller_switch;
 } FlutterDesktopEngineProperties;
+
+// ========== View Controller ==========
+
+// Creates a view that hosts and displays the given engine instance.
+//
+// This takes ownership of |engine|, so FlutterDesktopEngineDestroy should no
+// longer be called on it, as it will be called internally when the view
+// controller is destroyed. If creating the view controller fails, the engine
+// will be destroyed immediately.
+//
+// If |engine| is not already running, the view controller will start running
+// it automatically before displaying the window.
+//
+// The caller owns the returned reference, and is responsible for calling
+// FlutterDesktopViewControllerDestroy. Returns a null pointer in the event of
+// an error.
+//
+// The Win32 implementation accepts width, height with view hookup explicitly
+// performed using the caller using HWND parenting.
+FLUTTER_EXPORT FlutterDesktopViewControllerRef
+FlutterDesktopViewControllerCreate(int width,
+                                   int height,
+                                   FlutterDesktopEngineRef engine);
+
+// Shuts down the engine instance associated with |controller|, and cleans up
+// associated state.
+//
+// |controller| is no longer valid after this call.
+FLUTTER_EXPORT void FlutterDesktopViewControllerDestroy(
+    FlutterDesktopViewControllerRef controller);
+
+// Returns the view controller's view ID.
+FLUTTER_EXPORT FlutterDesktopViewId FlutterDesktopViewControllerGetViewId(
+    FlutterDesktopViewControllerRef view_controller);
+
+// Returns the handle for the engine running in FlutterDesktopViewControllerRef.
+//
+// Its lifetime is the same as the |controller|'s.
+FLUTTER_EXPORT FlutterDesktopEngineRef FlutterDesktopViewControllerGetEngine(
+    FlutterDesktopViewControllerRef controller);
+
+// Returns the view managed by the given controller.
+FLUTTER_EXPORT FlutterDesktopViewRef
+FlutterDesktopViewControllerGetView(FlutterDesktopViewControllerRef controller);
+
+// Requests new frame from the engine and repaints the view.
+FLUTTER_EXPORT void FlutterDesktopViewControllerForceRedraw(
+    FlutterDesktopViewControllerRef controller);
+
+// Allows the Flutter engine and any interested plugins an opportunity to
+// handle the given message.
+//
+// If the WindowProc was handled and further handling should stop, this returns
+// true and |result| will be populated. |result| is not set if returning false.
+FLUTTER_EXPORT bool FlutterDesktopViewControllerHandleTopLevelWindowProc(
+    FlutterDesktopViewControllerRef controller,
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam,
+    LRESULT* result);
 
 // ========== Engine ==========
 
@@ -95,6 +225,21 @@ FLUTTER_EXPORT bool FlutterDesktopEngineDestroy(FlutterDesktopEngineRef engine);
 FLUTTER_EXPORT bool FlutterDesktopEngineRun(FlutterDesktopEngineRef engine,
                                             const char* entry_point);
 
+// DEPRECATED: This is no longer necessary to call, Flutter will take care of
+// processing engine messages transparently through DispatchMessage.
+//
+// Processes any pending events in the Flutter engine, and returns the
+// number of nanoseconds until the next scheduled event (or max, if none).
+//
+// This should be called on every run of the application-level runloop, and
+// a wait for native events in the runloop should never be longer than the
+// last return value from this function.
+FLUTTER_EXPORT uint64_t
+FlutterDesktopEngineProcessMessages(FlutterDesktopEngineRef engine);
+
+FLUTTER_EXPORT void FlutterDesktopEngineReloadSystemFonts(
+    FlutterDesktopEngineRef engine);
+
 // Returns the plugin registrar handle for the plugin with the given name.
 //
 // The name must be unique across the application.
@@ -111,6 +256,140 @@ FlutterDesktopEngineGetPluginRegistrar(FlutterDesktopEngineRef engine,
 // will potentially outlive 'engine', such as when passing it to another thread.
 FLUTTER_EXPORT FlutterDesktopMessengerRef
 FlutterDesktopEngineGetMessenger(FlutterDesktopEngineRef engine);
+
+// Returns the texture registrar associated with the engine.
+FLUTTER_EXPORT FlutterDesktopTextureRegistrarRef
+FlutterDesktopEngineGetTextureRegistrar(FlutterDesktopEngineRef engine);
+
+// Schedule a callback to be called after the next frame is drawn.
+//
+// This must be called from the platform thread. The callback is executed only
+// once on the platform thread.
+FLUTTER_EXPORT void FlutterDesktopEngineSetNextFrameCallback(
+    FlutterDesktopEngineRef engine,
+    VoidCallback callback,
+    void* user_data);
+
+// Returns true if the current thread is the platform thread.
+// This can be called on any thread.
+FLUTTER_EXPORT bool FlutterDesktopEngineIsPlatformThread(
+    FlutterDesktopEngineRef engine);
+
+// Schedule a callback to be called on the platform thread.
+//
+// This can be called on any thread. The callback is executed only
+// once on the platform thread.
+//
+// If the task is discarded without being executed (e.g. during engine
+// shutdown), |on_cancel| is called on the platform thread so the caller can
+// cleanup allocations. |on_cancel| can be nullptr if no cleanup is needed.
+FLUTTER_EXPORT void FlutterDesktopEnginePostPlatformThreadTask(
+    FlutterDesktopEngineRef engine,
+    VoidCallback callback,
+    VoidCallback on_cancel,
+    void* user_data);
+
+// ========== View ==========
+
+// Returns the backing HWND for manipulation in host application.
+FLUTTER_EXPORT HWND FlutterDesktopViewGetHWND(FlutterDesktopViewRef view);
+
+// Returns the DXGI adapter used for rendering or nullptr in case of error.
+// The caller must release the adapter.
+// DEPRECATED: Use |FlutterDesktopEngineGetGraphicsAdapter| instead.
+FLUTTER_EXPORT IDXGIAdapter* FlutterDesktopViewGetGraphicsAdapter(
+    FlutterDesktopViewRef view);
+
+// Retrieves the DXGI adapter used for rendering. Returns true if the adapter
+// was successfully retrieved, or false if an error occured.
+// The caller must provide a valid pointer to an IDXGIAdapter* and is
+// responsible for releasing the adapter.
+FLUTTER_EXPORT bool FlutterDesktopEngineGetGraphicsAdapter(
+    FlutterDesktopEngineRef engine,
+    IDXGIAdapter** adapter_out);
+
+// Called to pass an external window message to the engine for lifecycle
+// state updates. Non-Flutter windows must call this method in their WndProc
+// in order to be included in the logic for application lifecycle state
+// updates. Returns a result if the message should be consumed.
+FLUTTER_EXPORT bool FlutterDesktopEngineProcessExternalWindowMessage(
+    FlutterDesktopEngineRef engine,
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam,
+    LRESULT* result);
+
+// ========== Plugin Registrar (extensions) ==========
+// These are Windows-specific extensions to flutter_plugin_registrar.h
+
+// Function pointer type for top level WindowProc delegate registration.
+//
+// The user data will be whatever was passed to
+// FlutterDesktopRegisterTopLevelWindowProcHandler.
+//
+// Implementations should populate |result| and return true if the WindowProc
+// was handled and further handling should stop. |result| is ignored if the
+// function returns false.
+typedef bool (*FlutterDesktopWindowProcCallback)(HWND /* hwnd */,
+                                                 UINT /* uMsg */,
+                                                 WPARAM /*wParam*/,
+                                                 LPARAM /* lParam*/,
+                                                 void* /* user data */,
+                                                 LRESULT* result);
+
+// Returns the implicit view associated with this registrar's engine instance,
+// or null if there is no implicit view.
+//
+// See:
+// https://api.flutter.dev/flutter/dart-ui/PlatformDispatcher/implicitView.html
+//
+// DEPRECATED: Use |FlutterDesktopPluginRegistrarGetViewById| instead.
+FLUTTER_EXPORT FlutterDesktopViewRef FlutterDesktopPluginRegistrarGetView(
+    FlutterDesktopPluginRegistrarRef registrar);
+
+// Returns the view associated with the registrar's engine instance, or null if
+// the view does not exist.
+FLUTTER_EXPORT FlutterDesktopViewRef FlutterDesktopPluginRegistrarGetViewById(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopViewId view_id);
+
+FLUTTER_EXPORT void
+FlutterDesktopPluginRegistrarRegisterTopLevelWindowProcDelegate(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopWindowProcCallback delegate,
+    void* user_data);
+
+FLUTTER_EXPORT void
+FlutterDesktopPluginRegistrarUnregisterTopLevelWindowProcDelegate(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopWindowProcCallback delegate);
+
+// Retrieves the DXGI adapter used for rendering. Returns true if the adapter
+// was successfully retrieved, or false if an error occured.
+// The caller must provide a valid pointer to an IDXGIAdapter* and is
+// responsible for releasing the adapter.
+FLUTTER_EXPORT bool FlutterDesktopPluginRegistrarGetGraphicsAdapter(
+    FlutterDesktopPluginRegistrarRef registrar,
+    IDXGIAdapter** adapter_out);
+
+// ========== Freestanding Utilities ==========
+
+// Gets the DPI for a given |hwnd|, depending on the supported APIs per
+// windows version and DPI awareness mode. If nullptr is passed, returns the DPI
+// of the primary monitor.
+//
+// This uses the same logic and fallback for older Windows versions that is used
+// internally by Flutter to determine the DPI to use for displaying Flutter
+// content, so should be used by any code (e.g., in plugins) that translates
+// between Windows and Dart sizes/offsets.
+FLUTTER_EXPORT UINT FlutterDesktopGetDpiForHWND(HWND hwnd);
+
+// Gets the DPI for a given |monitor|. If the API is not available, a default
+// DPI of 96 is returned.
+//
+// See FlutterDesktopGetDpiForHWND for more information.
+FLUTTER_EXPORT UINT FlutterDesktopGetDpiForMonitor(HMONITOR monitor);
 
 // Reopens stdout and stderr and resysncs the standard library output streams.
 // Should be called if output is being directed somewhere in the runner process

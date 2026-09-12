@@ -217,7 +217,6 @@ class Cache {
   final Platform _platform;
   final FileSystem _fileSystem;
   final OperatingSystemUtils _osUtils;
-  OperatingSystemUtils get osUtils => _osUtils;
   final Directory? _rootOverride;
   final List<ArtifactSet> _artifacts;
   final Stdio? _stdio;
@@ -241,12 +240,7 @@ class Cache {
       tempStorage: getDownloadDir(),
       platform: _platform,
       httpClient: HttpClient(),
-      allowedBaseUrls: <String>[
-        storageBaseUrl,
-        realmlessStorageBaseUrl,
-        cipdBaseUrl,
-        originalStorageUrl,
-      ],
+      allowedBaseUrls: <String>[storageBaseUrl, realmlessStorageBaseUrl, cipdBaseUrl],
       stdio: _stdio,
     );
   }
@@ -562,8 +556,6 @@ class Cache {
     _maybeWarnAboutStorageOverride(overrideUrl);
     return overrideUrl;
   }
-
-  String get originalStorageUrl => 'https://storage.googleapis.com';
 
   String get realmlessStorageBaseUrl {
     return storageRealm.isEmpty ? storageBaseUrl : storageBaseUrl.replaceAll('/$storageRealm', '');

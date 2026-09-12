@@ -47,6 +47,8 @@ class PlatformIsolateManagerTest : public FixtureTest {
 
     TaskRunners task_runners(GetCurrentTestName(),    //
                              GetCurrentTaskRunner(),  //
+                             GetCurrentTaskRunner(),  //
+                             GetCurrentTaskRunner(),  //
                              GetCurrentTaskRunner()   //
     );
 

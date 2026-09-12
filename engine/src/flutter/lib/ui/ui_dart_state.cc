@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "flutter/fml/message_loop.h"
 #include "flutter/lib/ui/window/platform_configuration.h"
 #include "flutter/lib/ui/window/platform_message.h"
 #include "third_party/tonic/converter/dart_converter.h"
@@ -20,13 +21,32 @@ UIDartState::Context::Context(const TaskRunners& task_runners)
 
 UIDartState::Context::Context(
     const TaskRunners& task_runners,
+    fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate,
+    fml::WeakPtr<IOManager> io_manager,
+    fml::RefPtr<SkiaUnrefQueue> unref_queue,
+    fml::TaskRunnerAffineWeakPtr<ImageDecoder> image_decoder,
+    fml::TaskRunnerAffineWeakPtr<ImageGeneratorRegistry>
+        image_generator_registry,
     std::string advisory_script_uri,
     std::string advisory_script_entrypoint,
-    std::shared_ptr<fml::ConcurrentTaskRunner> concurrent_task_runner)
+    bool deterministic_rendering_enabled,
+    std::shared_ptr<fml::ConcurrentTaskRunner> concurrent_task_runner,
+    std::shared_future<impeller::RuntimeStageBackend> runtime_stage_backend,
+    bool enable_impeller,
+    bool enable_flutter_gpu)
     : task_runners(task_runners),
+      snapshot_delegate(std::move(snapshot_delegate)),
+      io_manager(std::move(io_manager)),
+      unref_queue(std::move(unref_queue)),
+      image_decoder(std::move(image_decoder)),
+      image_generator_registry(std::move(image_generator_registry)),
       advisory_script_uri(std::move(advisory_script_uri)),
       advisory_script_entrypoint(std::move(advisory_script_entrypoint)),
-      concurrent_task_runner(std::move(concurrent_task_runner)) {}
+      deterministic_rendering_enabled(deterministic_rendering_enabled),
+      concurrent_task_runner(std::move(concurrent_task_runner)),
+      runtime_stage_backend(std::move(runtime_stage_backend)),
+      enable_impeller(enable_impeller),
+      enable_flutter_gpu(enable_flutter_gpu) {}
 
 UIDartState::UIDartState(
     TaskObserverAdd add_callback,
@@ -54,6 +74,18 @@ UIDartState::~UIDartState() {
 
 const std::string& UIDartState::GetAdvisoryScriptURI() const {
   return context_.advisory_script_uri;
+}
+
+bool UIDartState::IsDeterministicRenderingEnabled() const {
+  return context_.deterministic_rendering_enabled;
+}
+
+bool UIDartState::IsImpellerEnabled() const {
+  return context_.enable_impeller;
+}
+
+bool UIDartState::IsFlutterGPUEnabled() const {
+  return context_.enable_impeller && context_.enable_flutter_gpu;
 }
 
 void UIDartState::DidSetIsolate() {
@@ -105,6 +137,14 @@ const TaskRunners& UIDartState::GetTaskRunners() const {
   return context_.task_runners;
 }
 
+fml::WeakPtr<IOManager> UIDartState::GetIOManager() const {
+  return context_.io_manager;
+}
+
+fml::RefPtr<flutter::SkiaUnrefQueue> UIDartState::GetSkiaUnrefQueue() const {
+  return context_.unref_queue;
+}
+
 std::shared_ptr<fml::ConcurrentTaskRunner>
 UIDartState::GetConcurrentTaskRunner() const {
   return context_.concurrent_task_runner;
@@ -144,6 +184,21 @@ void UIDartState::AddOrRemoveTaskObserver(bool add) {
                      reinterpret_cast<intptr_t>(this));
     callback_queue_id_.reset();
   }
+}
+
+fml::TaskRunnerAffineWeakPtr<SnapshotDelegate>
+UIDartState::GetSnapshotDelegate() const {
+  return context_.snapshot_delegate;
+}
+
+fml::TaskRunnerAffineWeakPtr<ImageDecoder> UIDartState::GetImageDecoder()
+    const {
+  return context_.image_decoder;
+}
+
+fml::TaskRunnerAffineWeakPtr<ImageGeneratorRegistry>
+UIDartState::GetImageGeneratorRegistry() const {
+  return context_.image_generator_registry;
 }
 
 std::shared_ptr<IsolateNameServer> UIDartState::GetIsolateNameServer() const {
@@ -186,6 +241,17 @@ Dart_Handle UIDartState::HandlePlatformMessage(
 
 int64_t UIDartState::GetRootIsolateToken() const {
   return IsRootIsolate() ? reinterpret_cast<int64_t>(this) : 0;
+}
+
+Dart_Isolate UIDartState::CreatePlatformIsolate(Dart_Handle entry_point,
+                                                char** error) {
+  FML_UNREACHABLE();
+  return nullptr;
+}
+
+/// The runtime stage to use for fragment shaders.
+impeller::RuntimeStageBackend UIDartState::GetRuntimeStageBackend() const {
+  return context_.runtime_stage_backend.get();
 }
 
 }  // namespace flutter

@@ -71,6 +71,7 @@ std::unique_ptr<AutoIsolateShutdown> RunDartCodeInIsolateOnUITaskRunner(
     std::string entrypoint,
     const std::vector<std::string>& args,
     const std::string& kernel_file_path,
+    fml::WeakPtr<IOManager> io_manager,
     std::unique_ptr<PlatformConfiguration> platform_configuration) {
   FML_CHECK(task_runners.GetUITaskRunner()->RunsTasksOnCurrentThread());
 
@@ -119,8 +120,10 @@ std::unique_ptr<AutoIsolateShutdown> RunDartCodeInIsolateOnUITaskRunner(
       IsolateConfiguration::InferFromSettings(settings);
 
   UIDartState::Context context(task_runners);
+  context.io_manager = std::move(io_manager);
   context.advisory_script_uri = "main.dart";
   context.advisory_script_entrypoint = entrypoint.c_str();
+  context.enable_impeller = p_settings.enable_impeller;
 
   auto isolate =
       DartIsolate::CreateRunningRootIsolate(
@@ -155,6 +158,7 @@ std::unique_ptr<AutoIsolateShutdown> RunDartCodeInIsolate(
     std::string entrypoint,
     const std::vector<std::string>& args,
     const std::string& kernel_file_path,
+    fml::WeakPtr<IOManager> io_manager,
     std::unique_ptr<PlatformConfiguration> platform_configuration) {
   std::unique_ptr<AutoIsolateShutdown> result;
   fml::AutoResetWaitableEvent latch;
@@ -162,7 +166,7 @@ std::unique_ptr<AutoIsolateShutdown> RunDartCodeInIsolate(
       task_runners.GetUITaskRunner(), fml::MakeCopyable([&]() mutable {
         result = RunDartCodeInIsolateOnUITaskRunner(
             vm_ref, settings, task_runners, entrypoint, args, kernel_file_path,
-            std::move(platform_configuration));
+            io_manager, std::move(platform_configuration));
         latch.Signal();
       }));
   latch.Wait();

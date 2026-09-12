@@ -49,7 +49,8 @@ static std::shared_ptr<DartIsolate> CreateAndRunRootIsolate(
     const fml::RefPtr<fml::TaskRunner>& task_runner,
     std::string entrypoint) {
   FML_CHECK(!entrypoint.empty());
-  TaskRunners runners("io.flutter.test", task_runner, task_runner);
+  TaskRunners runners("io.flutter.test", task_runner, task_runner, task_runner,
+                      task_runner);
 
   auto isolate_configuration =
       IsolateConfiguration::InferFromSettings(settings);

@@ -22,7 +22,9 @@ struct ThreadHost {
   enum Type {
     kPlatform = 1 << 0,
     kUi = 1 << 1,
-    kProfiler = 1 << 2,
+    kRaster = 1 << 2,
+    kIo = 1 << 3,
+    kProfiler = 1 << 4,
   };
 
   /// The collection of all the thread configures, and we create custom thread
@@ -55,6 +57,12 @@ struct ThreadHost {
     /// Specified the Platform Thread Config, meanwhile set the mask.
     void SetPlatformConfig(const ThreadConfig&);
 
+    /// Specified the IO Thread Config, meanwhile set the mask.
+    void SetRasterConfig(const ThreadConfig&);
+
+    /// Specified the IO Thread Config, meanwhile set the mask.
+    void SetIOConfig(const ThreadConfig&);
+
     /// Specified the ProfilerThread  Config, meanwhile set the mask.
     void SetProfilerConfig(const ThreadConfig&);
 
@@ -66,12 +74,16 @@ struct ThreadHost {
 
     std::optional<ThreadConfig> platform_config;
     std::optional<ThreadConfig> ui_config;
+    std::optional<ThreadConfig> raster_config;
+    std::optional<ThreadConfig> io_config;
     std::optional<ThreadConfig> profiler_config;
   };
 
   std::string name_prefix;
   std::unique_ptr<fml::Thread> platform_thread;
   std::unique_ptr<fml::Thread> ui_thread;
+  std::unique_ptr<fml::Thread> raster_thread;
+  std::unique_ptr<fml::Thread> io_thread;
   std::unique_ptr<fml::Thread> profiler_thread;
 
   ThreadHost();

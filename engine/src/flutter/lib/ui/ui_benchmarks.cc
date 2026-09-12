@@ -15,14 +15,17 @@
 namespace flutter {
 
 class Fixture : public testing::FixtureTest {
-  void TestBody() override{};
+  void TestBody() override {};
 };
 
 static void BM_PlatformMessageResponseDartComplete(benchmark::State& state) {
   ThreadHost thread_host(ThreadHost::ThreadHostConfig(
-      "test", ThreadHost::Type::kPlatform | ThreadHost::Type::kUi));
+      "test", ThreadHost::Type::kPlatform | ThreadHost::Type::kRaster |
+                  ThreadHost::Type::kIo | ThreadHost::Type::kUi));
   TaskRunners task_runners("test", thread_host.platform_thread->GetTaskRunner(),
-                           thread_host.ui_thread->GetTaskRunner());
+                           thread_host.raster_thread->GetTaskRunner(),
+                           thread_host.ui_thread->GetTaskRunner(),
+                           thread_host.io_thread->GetTaskRunner());
   Fixture fixture;
   auto settings = fixture.CreateSettingsForFixture();
   auto vm_ref = DartVMRef::Create(settings);

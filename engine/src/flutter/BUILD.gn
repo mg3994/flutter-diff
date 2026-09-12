@@ -4,7 +4,10 @@
 
 import("//build/toolchain/clang.gni")
 import("//flutter/common/config.gni")
+import("//flutter/examples/examples.gni")
+import("//flutter/shell/config.gni")
 import("//flutter/shell/platform/config.gni")
+import("//flutter/shell/platform/glfw/config.gni")
 import("//flutter/testing/testing.gni")
 import("$dart_src/build/dart/copy_tree.gni")
 
@@ -79,8 +82,20 @@ group("flutter") {
       "//flutter/shell/platform/embedder:flutter_engine",
       "//flutter/sky",
     ]
-    if (enable_unittests || enable_ios_unittests) {
+    if (enable_unittests) {
       public_deps += [ ":unittests" ]
+    }
+  }
+
+  # Ensure the example for a sample embedder compiles.
+  if (build_embedder_examples) {
+    public_deps += [
+      "//flutter/examples/glfw",
+      "//flutter/examples/vulkan_glfw",
+    ]
+
+    if (!is_mac) {
+      public_deps += [ "//flutter/examples/glfw_drm" ]
     }
   }
 
@@ -97,6 +112,13 @@ group("flutter") {
         # //flutter/lib/snapshot:generate_snapshot_bin will only build
         # gen_snapshot for the host and not the target.
         "$dart_src/runtime/bin:gen_snapshot",
+
+        # Impeller artifacts - compiler and libtessellator
+        "//flutter/impeller/compiler:impellerc",
+        "//flutter/impeller/tessellator:tessellator_shared",
+
+        # path_ops
+        "//flutter/tools/path_ops",
       ]
 
       if (host_os == "linux" || host_os == "mac") {
@@ -133,10 +155,22 @@ group("flutter") {
   # Compile all benchmark targets if enabled.
   if (enable_unittests && !is_win && !is_fuchsia) {
     public_deps += [
+      "//flutter/display_list:display_list_benchmarks",
+      "//flutter/display_list:display_list_builder_benchmarks",
+      "//flutter/display_list:display_list_region_benchmarks",
+      "//flutter/display_list:display_list_transform_benchmarks",
+      "//flutter/display_list:primitive_rendering_benchmarks",
       "//flutter/fml:fml_benchmarks",
+      "//flutter/impeller/geometry:geometry_benchmarks",
       "//flutter/lib/ui:ui_benchmarks",
       "//flutter/shell/common:shell_benchmarks",
+      "//flutter/txt:txt_benchmarks",
     ]
+  }
+
+  # Build the standalone Impeller library.
+  if (is_mac || is_linux || is_win || is_android || is_qnx) {
+    public_deps += [ "//flutter/impeller/toolkit/interop:sdk" ]
   }
 
   if ((flutter_runtime_mode == "debug" || flutter_runtime_mode == "profile") &&
@@ -156,8 +190,13 @@ group("unittests") {
 
   public_deps = []
   if (is_android) {
-    public_deps +=
-        [ "//flutter/shell/platform/android:flutter_shell_native_unittests" ]
+    public_deps += [
+      "//flutter/impeller/renderer/backend/vulkan:vulkan_android_apk_unittests",
+      "//flutter/impeller/renderer/backend/vulkan:vulkan_android_unittests",
+      "//flutter/impeller/toolkit/android:apk_unittests",
+      "//flutter/impeller/toolkit/android:unittests",
+      "//flutter/shell/platform/android:flutter_shell_native_unittests",
+    ]
   }
 
   if (enable_ios_unittests) {
@@ -167,6 +206,9 @@ group("unittests") {
   if (enable_unittests) {
     public_deps += [
       "//flutter/assets:assets_unittests",
+      "//flutter/display_list:display_list_rendertests",
+      "//flutter/display_list:display_list_unittests",
+      "//flutter/flow:flow_unittests",
       "//flutter/fml:fml_unittests",
       "//flutter/lib/ui:ui_unittests",
       "//flutter/runtime:dart_plugin_registrant_unittests",
@@ -174,20 +216,42 @@ group("unittests") {
       "//flutter/runtime:runtime_unittests",
       "//flutter/shell/common:shell_unittests",
       "//flutter/shell/geometry:geometry_unittests",
+      "//flutter/shell/gpu:gpu_surface_unittests",
+      "//flutter/shell/platform/embedder:embedder_a11y_unittests",
       "//flutter/shell/platform/embedder:embedder_proctable_unittests",
       "//flutter/shell/platform/embedder:embedder_unittests",
       "//flutter/testing:testing_unittests",
       "//flutter/testing/dart",
       "//flutter/testing/smoke_test_failure",
       "//flutter/third_party/tonic/tests:tonic_unittests",
+      "//flutter/txt:txt_unittests",
     ]
+
+    if (!is_fuchsia) {
+      public_deps += [ "//flutter/lib/gpu:gpu_unittests" ]
+    }
+
+    # The accessibility library only supports Mac and Windows at the moment.
+    if (is_mac || is_win) {
+      public_deps +=
+          [ "//flutter/third_party/accessibility:accessibility_unittests" ]
+    }
 
     if (is_fuchsia) {
       public_deps += [ "//flutter/shell/platform/fuchsia:tests" ]
     }
 
+    if (is_mac || is_linux || is_win) {
+      public_deps += [
+        "//flutter/impeller:impeller_dart_unittests",
+        "//flutter/impeller:impeller_unittests",
+        "//flutter/impeller/toolkit/interop:example",
+      ]
+    }
+
     if (is_mac) {
       public_deps += [
+        "//flutter/impeller/golden_tests:impeller_golden_tests",
         "//flutter/shell/platform/darwin/common:availability_version_check_unittests",
         "//flutter/shell/platform/darwin/common:framework_common_swift_unittests",
         "//flutter/shell/platform/darwin/common:framework_common_unittests",
@@ -197,7 +261,9 @@ group("unittests") {
 
     if (!is_win && !is_fuchsia) {
       public_deps += [
+        "//flutter/shell/platform/android/external_view_embedder:android_external_view_embedder_unittests",
         "//flutter/shell/platform/android/jni:jni_unittests",
+        "//flutter/shell/platform/android/platform_view_android_delegate:platform_view_android_delegate_unittests",
       ]
     }
 
@@ -214,15 +280,25 @@ group("unittests") {
         # TODO(): Enable when embedder works on fuchsia.
         public_deps +=
             [ "//flutter/shell/platform/common:common_cpp_unittests" ]
+
+        # These tests require GLFW and thus cannot run on fuchsia.
+        public_deps += [ "//flutter/shell/platform/glfw/client_wrapper:client_wrapper_glfw_unittests" ]
       }
 
       if (is_linux) {
         public_deps +=
             [ "//flutter/shell/platform/linux:flutter_linux_unittests" ]
+        if (build_glfw_shell) {
+          public_deps +=
+              [ "//flutter/shell/platform/glfw:flutter_glfw_unittests" ]
+        }
       }
 
       if (is_mac) {
-        public_deps += [ "//flutter/shell/platform/darwin/macos:flutter_desktop_darwin_unittests" ]
+        public_deps += [
+          "//flutter/shell/platform/darwin/macos:flutter_desktop_darwin_swift_unittests",
+          "//flutter/shell/platform/darwin/macos:flutter_desktop_darwin_unittests",
+        ]
       }
 
       if (is_win) {
@@ -246,7 +322,10 @@ if (build_engine_artifacts) {
 group("dist") {
   testonly = true
 
-  deps = [ "//flutter/sky/dist" ]
+  deps = [
+    "//flutter/lib/gpu/dist",
+    "//flutter/sky/dist",
+  ]
 }
 
 if (is_fuchsia && enable_unittests) {

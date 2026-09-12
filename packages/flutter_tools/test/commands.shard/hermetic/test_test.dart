@@ -216,42 +216,6 @@ dev_dependencies:
         Cache: () => Cache.test(processManager: FakeProcessManager.any()),
       },
     );
-
-    testUsingContext(
-      'passes boolean selectors and multiple tags/exclude-tags through to package:test',
-      () async {
-        final fakePackageTest = FakePackageTest();
-        final testCommand = TestCommand(testWrapper: fakePackageTest);
-        final CommandRunner<void> commandRunner = createTestCommandRunner(testCommand);
-
-        await commandRunner.run(<String>[
-          'test',
-          '--no-pub',
-          '--tags=a || b',
-          '--tags=c',
-          '--exclude-tags=d && e',
-          '--exclude-tags=f',
-        ]);
-        expect(
-          fakePackageTest.lastArgs,
-          containsAllInOrder(<String>[
-            '--tags',
-            'a || b',
-            '--tags',
-            'c',
-            '--exclude-tags',
-            'd && e',
-            '--exclude-tags',
-            'f',
-          ]),
-        );
-      },
-      overrides: <Type, Generator>{
-        FileSystem: () => fs,
-        ProcessManager: () => FakeProcessManager.any(),
-        Cache: () => Cache.test(processManager: FakeProcessManager.any()),
-      },
-    );
   });
 
   group('--reporter/-r', () {
@@ -1728,8 +1692,8 @@ class FakeFlutterTestRunner implements FlutterTestRunner {
     required DebuggingOptions debuggingOptions,
     List<String> names = const <String>[],
     List<String> plainNames = const <String>[],
-    List<String> tags = const <String>[],
-    List<String> excludeTags = const <String>[],
+    String? tags,
+    String? excludeTags,
     bool enableVmService = false,
     bool ipv6 = false,
     bool machine = false,
@@ -1786,8 +1750,8 @@ class FakeFlutterTestRunner implements FlutterTestRunner {
     required DebuggingOptions debuggingOptions,
     List<String> names = const <String>[],
     List<String> plainNames = const <String>[],
-    List<String> tags = const <String>[],
-    List<String> excludeTags = const <String>[],
+    String? tags,
+    String? excludeTags,
     bool machine = false,
     bool updateGoldens = false,
     required int? concurrency,

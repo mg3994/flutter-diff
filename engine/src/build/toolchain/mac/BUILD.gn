@@ -225,9 +225,7 @@ template("mac_toolchain") {
       # The list of outputs and partial_outputs change whether the whole
       # module optimization is enabled or not.
       if (swift_whole_module_optimization) {
-        outputs += [
-          "$_output_dir/{{module_name}}.swiftconstvalues",
-        ]
+        outputs += [ "$_output_dir/{{module_name}}.swiftconstvalues" ]
       } else {
         outputs += [ "$_output_dir/{{module_name}}.priors" ]
         partial_outputs += [
@@ -320,11 +318,11 @@ template("mac_toolchain") {
               root_build_dir)
 
       command =
-          "$_env_vars $python_path $_tool --module-name {{module_name}} " +
+          "$_env_vars $python_path $_tool -module-name {{module_name}} " +
           "--header-path $_header_path --target-out-dir $_output_dir " +
           "--const-gather-protocols-file $_const_gather_protocols_file " +
           "--depfile-path $depfile --src-dir $_src_dir --gen-dir $_gen_dir " +
-          "--bridge-header {{bridge_header}} {{include_dirs}} " +
+          "-import-objc-header {{bridge_header}} {{include_dirs}} " +
           "{{module_dirs}} {{swiftflags}} {{inputs}}$_extra_flags"
 
       description = "SWIFT $_output_dir/{{module_name}}.swiftmodule"
@@ -461,8 +459,7 @@ if (is_ios) {
     is_clang = true
 
     sysroot_rel = rebase_path(ios_sdk_path, root_build_dir)
-    sysroot_flags =
-        "-isysroot $sysroot_rel -mios-simulator-version-min=$ios_deployment_target"
+    sysroot_flags = "-isysroot $sysroot_rel -mios-simulator-version-min=$ios_deployment_target"
   }
 
   # Toolchain used for iOS simulator targets (x64).
@@ -479,8 +476,7 @@ if (is_ios) {
     is_clang = true
 
     sysroot_rel = rebase_path(ios_sdk_path, root_build_dir)
-    sysroot_flags =
-        "-isysroot $sysroot_rel -mios-simulator-version-min=$ios_deployment_target"
+    sysroot_flags = "-isysroot $sysroot_rel -mios-simulator-version-min=$ios_deployment_target"
   }
 }
 

@@ -25,7 +25,6 @@ import '../base/platform.dart';
 import '../build_info.dart';
 import '../cache.dart';
 import '../convert.dart';
-import '../dart/package_map.dart';
 import '../globals.dart' as globals;
 import '../web/bootstrap.dart';
 import '../web/chrome.dart';
@@ -348,7 +347,7 @@ class WebAssetServer implements AssetReader {
                 PackageUriMapper(packageConfig),
                 digestProvider,
                 BuildSettings(
-                  appEntrypoint: packageConfig.toPackageUriForWorkspace(
+                  appEntrypoint: packageConfig.toPackageUri(
                     fileSystem.file(entrypoint).absolute.uri,
                   ),
                   canaryFeatures: canaryFeatures,
@@ -362,7 +361,7 @@ class WebAssetServer implements AssetReader {
                 PackageUriMapper(packageConfig),
                 digestProvider,
                 BuildSettings(
-                  appEntrypoint: packageConfig.toPackageUriForWorkspace(
+                  appEntrypoint: packageConfig.toPackageUri(
                     fileSystem.file(entrypoint).absolute.uri,
                   ),
                   canaryFeatures: canaryFeatures,

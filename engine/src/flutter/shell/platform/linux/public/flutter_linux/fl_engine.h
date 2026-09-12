@@ -14,6 +14,7 @@
 
 #include "fl_binary_messenger.h"
 #include "fl_dart_project.h"
+#include "fl_texture_registrar.h"
 
 G_BEGIN_DECLS
 
@@ -47,20 +48,6 @@ FlEngine* fl_engine_new(FlDartProject* project);
 FlEngine* fl_engine_new_headless(FlDartProject* project);
 
 /**
- * fl_engine_start:
- * @engine: an #FlEngine.
- * @error: (allow-none): #GError location to store the error occurring, or %NULL
- * to ignore. If `error` is not %NULL, `*error` must be initialized (typically
- * %NULL, but an error from a previous call using GLib error handling is
- * explicitly valid).
- *
- * Starts the Flutter engine.
- *
- * Returns: %TRUE on success.
- */
-gboolean fl_engine_start(FlEngine* engine, GError** error);
-
-/**
  * fl_engine_get_binary_messenger:
  * @engine: an #FlEngine.
  *
@@ -70,12 +57,15 @@ gboolean fl_engine_start(FlEngine* engine, GError** error);
  */
 FlBinaryMessenger* fl_engine_get_binary_messenger(FlEngine* engine);
 
-/*
- * Blocks until a Flutter message is posted on task runner and then processes
- * it. Must be called on platform thread. During polling no other system
- * messages are processed.
+/**
+ * fl_engine_get_texture_registrar:
+ * @engine: an #FlEngine.
+ *
+ * Gets the texture registrar for registering textures.
+ *
+ * Returns: an #FlTextureRegistrar.
  */
-void fl_engine_poll_task_runner(FlEngine* self);
+FlTextureRegistrar* fl_engine_get_texture_registrar(FlEngine* engine);
 
 G_END_DECLS
 

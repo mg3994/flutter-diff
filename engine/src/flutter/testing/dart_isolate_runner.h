@@ -52,6 +52,7 @@ void RunDartCodeInIsolate(
     std::string entrypoint,
     const std::vector<std::string>& args,
     const std::string& fixtures_path,
+    fml::WeakPtr<IOManager> io_manager = {},
     std::unique_ptr<PlatformConfiguration> platform_configuration = nullptr);
 
 std::unique_ptr<AutoIsolateShutdown> RunDartCodeInIsolate(
@@ -61,6 +62,7 @@ std::unique_ptr<AutoIsolateShutdown> RunDartCodeInIsolate(
     std::string entrypoint,
     const std::vector<std::string>& args,
     const std::string& fixtures_path,
+    fml::WeakPtr<IOManager> io_manager = {},
     std::unique_ptr<PlatformConfiguration> platform_configuration = nullptr);
 
 }  // namespace flutter::testing

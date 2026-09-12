@@ -31,8 +31,9 @@
                 "config": "ci/host_debug_test",
                 "targets": [
                     "flutter:unittests",
-                    "flutter/build/dart:copy_dart_sdk",
-                    "flutter/shell/testing"
+                    "flutter/build/dart:dart_sdk",
+                    "flutter/shell/testing",
+                    "flutter/tools/path_ops"
                 ]
             },
             "tests": [
@@ -77,11 +78,12 @@
                 "config": "ci/host_profile_test",
                 "targets": [
                     "flutter:unittests",
-                    "flutter/build/dart:copy_dart_sdk",
-                    "flutter/shell/testing"
+                    "flutter/build/dart:dart_sdk",
+                    "flutter/shell/testing",
+                    "flutter/tools/path_ops"
                 ]
             },
-            "tests": [
+             "tests": [
                 {
                     "language": "python3",
                     "name": "Host Tests for host_profile",
@@ -129,16 +131,18 @@
                 "config": "ci/host_release_test",
                 "targets": [
                     "flutter:unittests",
-                    "flutter/build/dart:copy_dart_sdk",
+                    "flutter/build/dart:dart_sdk",
                     "flutter/display_list:display_list_benchmarks",
                     "flutter/display_list:display_list_builder_benchmarks",
                     "flutter/display_list:display_list_region_benchmarks",
                     "flutter/display_list:display_list_transform_benchmarks",
+                    "flutter/display_list:primitive_rendering_benchmarks",
                     "flutter/fml:fml_benchmarks",
                     "flutter/impeller/geometry:geometry_benchmarks",
                     "flutter/lib/ui:ui_benchmarks",
                     "flutter/shell/common:shell_benchmarks",
                     "flutter/shell/testing",
+                    "flutter/tools/path_ops",
                     "flutter/txt:txt_benchmarks"
                 ]
             },

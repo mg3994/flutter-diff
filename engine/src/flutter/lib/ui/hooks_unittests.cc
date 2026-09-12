@@ -26,9 +26,11 @@ using HooksTest = ShellTest;
 TEST_F(HooksTest, HooksUnitTests) {
   auto settings = CreateSettingsForFixture();
 
-  TaskRunners task_runners(GetCurrentTestName(),    // label
-                           GetCurrentTaskRunner(),  // platform
-                           CreateNewThread("ui")    // ui
+  TaskRunners task_runners(GetCurrentTestName(),       // label
+                           GetCurrentTaskRunner(),     // platform
+                           CreateNewThread("raster"),  // raster
+                           CreateNewThread("ui"),      // ui
+                           CreateNewThread("io")       // io
   );
 
   auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();

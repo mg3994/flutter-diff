@@ -1805,6 +1805,310 @@ class RRect extends _RRectLike<RRect> {
   }
 }
 
+/// An immutable rounded superellipse.
+///
+/// A rounded superellipse (not to be confused with a standard superellipse) is
+/// a shape formed by replacing the four curved corners of a superellipse with
+/// circular arcs. A (standard) superellipse follows the formula x^n + y^n =
+/// a^n, and while n > 2 gives it rounded corners, they tend to be too sharp and
+/// pronounced.  Replacing them with circular arcs makes the shape feel softer
+/// and more natural.
+///
+/// Visually, a rounded superellipse looks similar to a typical rounded rectangle
+/// ([RRect]) but with smoother transitions between the straight edges and
+/// corners. It closely matches the `RoundedRectangle` shape in SwiftUI with the
+/// `.continuous` corner style.
+class RSuperellipse extends _RRectLike<RSuperellipse> {
+  /// Construct a rounded rectangle from its left, top, right, and bottom edges,
+  /// and the same radii along its horizontal axis and its vertical axis.
+  ///
+  /// Will assert in debug mode if `radiusX` or `radiusY` are negative.
+  const RSuperellipse.fromLTRBXY(
+    double left,
+    double top,
+    double right,
+    double bottom,
+    double radiusX,
+    double radiusY,
+  ) : this._raw(
+        top: top,
+        left: left,
+        right: right,
+        bottom: bottom,
+        tlRadiusX: radiusX,
+        tlRadiusY: radiusY,
+        trRadiusX: radiusX,
+        trRadiusY: radiusY,
+        blRadiusX: radiusX,
+        blRadiusY: radiusY,
+        brRadiusX: radiusX,
+        brRadiusY: radiusY,
+      );
+
+  /// Construct a rounded rectangle from its left, top, right, and bottom edges,
+  /// and the same radius in each corner.
+  ///
+  /// Will assert in debug mode if the `radius` is negative in either x or y.
+  RSuperellipse.fromLTRBR(double left, double top, double right, double bottom, Radius radius)
+    : this._raw(
+        top: top,
+        left: left,
+        right: right,
+        bottom: bottom,
+        tlRadiusX: radius.x,
+        tlRadiusY: radius.y,
+        trRadiusX: radius.x,
+        trRadiusY: radius.y,
+        blRadiusX: radius.x,
+        blRadiusY: radius.y,
+        brRadiusX: radius.x,
+        brRadiusY: radius.y,
+      );
+
+  /// Construct a rounded rectangle from its bounding box and the same radii
+  /// along its horizontal axis and its vertical axis.
+  ///
+  /// Will assert in debug mode if `radiusX` or `radiusY` are negative.
+  RSuperellipse.fromRectXY(Rect rect, double radiusX, double radiusY)
+    : this._raw(
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        bottom: rect.bottom,
+        tlRadiusX: radiusX,
+        tlRadiusY: radiusY,
+        trRadiusX: radiusX,
+        trRadiusY: radiusY,
+        blRadiusX: radiusX,
+        blRadiusY: radiusY,
+        brRadiusX: radiusX,
+        brRadiusY: radiusY,
+      );
+
+  /// Construct a rounded rectangle from its bounding box and a radius that is
+  /// the same in each corner.
+  ///
+  /// Will assert in debug mode if the `radius` is negative in either x or y.
+  RSuperellipse.fromRectAndRadius(Rect rect, Radius radius)
+    : this._raw(
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        bottom: rect.bottom,
+        tlRadiusX: radius.x,
+        tlRadiusY: radius.y,
+        trRadiusX: radius.x,
+        trRadiusY: radius.y,
+        blRadiusX: radius.x,
+        blRadiusY: radius.y,
+        brRadiusX: radius.x,
+        brRadiusY: radius.y,
+      );
+
+  /// Construct a rounded rectangle from its left, top, right, and bottom edges,
+  /// and topLeft, topRight, bottomRight, and bottomLeft radii.
+  ///
+  /// The corner radii default to [Radius.zero], i.e. right-angled corners. Will
+  /// assert in debug mode if any of the radii are negative in either x or y.
+  RSuperellipse.fromLTRBAndCorners(
+    double left,
+    double top,
+    double right,
+    double bottom, {
+    Radius topLeft = Radius.zero,
+    Radius topRight = Radius.zero,
+    Radius bottomRight = Radius.zero,
+    Radius bottomLeft = Radius.zero,
+  }) : this._raw(
+         top: top,
+         left: left,
+         right: right,
+         bottom: bottom,
+         tlRadiusX: topLeft.x,
+         tlRadiusY: topLeft.y,
+         trRadiusX: topRight.x,
+         trRadiusY: topRight.y,
+         blRadiusX: bottomLeft.x,
+         blRadiusY: bottomLeft.y,
+         brRadiusX: bottomRight.x,
+         brRadiusY: bottomRight.y,
+       );
+
+  /// Construct a rounded rectangle from its bounding box and topLeft,
+  /// topRight, bottomRight, and bottomLeft radii.
+  ///
+  /// The corner radii default to [Radius.zero], i.e. right-angled corners. Will
+  /// assert in debug mode if any of the radii are negative in either x or y.
+  RSuperellipse.fromRectAndCorners(
+    Rect rect, {
+    Radius topLeft = Radius.zero,
+    Radius topRight = Radius.zero,
+    Radius bottomRight = Radius.zero,
+    Radius bottomLeft = Radius.zero,
+  }) : this._raw(
+         top: rect.top,
+         left: rect.left,
+         right: rect.right,
+         bottom: rect.bottom,
+         tlRadiusX: topLeft.x,
+         tlRadiusY: topLeft.y,
+         trRadiusX: topRight.x,
+         trRadiusY: topRight.y,
+         blRadiusX: bottomLeft.x,
+         blRadiusY: bottomLeft.y,
+         brRadiusX: bottomRight.x,
+         brRadiusY: bottomRight.y,
+       );
+
+  const RSuperellipse._raw({
+    super.left = 0.0,
+    super.top = 0.0,
+    super.right = 0.0,
+    super.bottom = 0.0,
+    super.tlRadiusX = 0.0,
+    super.tlRadiusY = 0.0,
+    super.trRadiusX = 0.0,
+    super.trRadiusY = 0.0,
+    super.brRadiusX = 0.0,
+    super.brRadiusY = 0.0,
+    super.blRadiusX = 0.0,
+    super.blRadiusY = 0.0,
+  });
+
+  @override
+  RSuperellipse _create({
+    required double left,
+    required double top,
+    required double right,
+    required double bottom,
+    required double tlRadiusX,
+    required double tlRadiusY,
+    required double trRadiusX,
+    required double trRadiusY,
+    required double brRadiusX,
+    required double brRadiusY,
+    required double blRadiusX,
+    required double blRadiusY,
+  }) => RSuperellipse._raw(
+    top: top,
+    left: left,
+    right: right,
+    bottom: bottom,
+    tlRadiusX: tlRadiusX,
+    tlRadiusY: tlRadiusY,
+    trRadiusX: trRadiusX,
+    trRadiusY: trRadiusY,
+    blRadiusX: blRadiusX,
+    blRadiusY: blRadiusY,
+    brRadiusX: brRadiusX,
+    brRadiusY: brRadiusY,
+  );
+
+  _NativeRSuperellipse _native() {
+    return _NativeRSuperellipse(this);
+  }
+
+  /// Whether the point specified by the given offset (which is assumed to be
+  /// relative to the origin) lies inside the rounded superellipse.
+  bool contains(Offset point) {
+    return _native().contains(point);
+  }
+
+  /// A rounded rectangle with all the values set to zero.
+  static const RSuperellipse zero = RSuperellipse._raw();
+
+  /// Linearly interpolate between two rounded superellipses.
+  ///
+  /// If either is null, this function substitutes [RSuperellipse.zero] instead.
+  ///
+  /// The `t` argument represents position on the timeline, with 0.0 meaning
+  /// that the interpolation has not started, returning `a` (or something
+  /// equivalent to `a`), 1.0 meaning that the interpolation has finished,
+  /// returning `b` (or something equivalent to `b`), and values in between
+  /// meaning that the interpolation is at the relevant point on the timeline
+  /// between `a` and `b`. The interpolation can be extrapolated beyond 0.0 and
+  /// 1.0, so negative values and values greater than 1.0 are valid (and can
+  /// easily be generated by curves such as [Curves.elasticInOut]).
+  ///
+  /// Values for `t` are usually obtained from an [Animation<double>], such as
+  /// an [AnimationController].
+  static RSuperellipse? lerp(RSuperellipse? a, RSuperellipse? b, double t) {
+    if (a == null) {
+      if (b == null) {
+        return null;
+      }
+      return b._lerpTo(null, 1 - t);
+    }
+    return a._lerpTo(b, t);
+  }
+
+  @override
+  String toString() {
+    return _toString(className: 'RSuperellipse');
+  }
+}
+
+class _NativeRSuperellipse extends NativeFieldWrapperClass1 {
+  _NativeRSuperellipse(RSuperellipse rsuperellipse) {
+    _constructor(
+      rsuperellipse.left,
+      rsuperellipse.top,
+      rsuperellipse.right,
+      rsuperellipse.bottom,
+      rsuperellipse.tlRadiusX,
+      rsuperellipse.tlRadiusY,
+      rsuperellipse.trRadiusX,
+      rsuperellipse.trRadiusY,
+      rsuperellipse.brRadiusX,
+      rsuperellipse.brRadiusY,
+      rsuperellipse.blRadiusX,
+      rsuperellipse.blRadiusY,
+    );
+  }
+
+  @Native<
+    Void Function(
+      Handle,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+      Double,
+    )
+  >(symbol: 'RSuperellipse::Create')
+  external void _constructor(
+    double left,
+    double top,
+    double right,
+    double bottom,
+    double tlRadiusX,
+    double tlRadiusY,
+    double trRadiusX,
+    double trRadiusY,
+    double brRadiusX,
+    double brRadiusY,
+    double blRadiusX,
+    double blRadiusY,
+  );
+
+  bool contains(Offset point) {
+    return _contains(point.dx, point.dy);
+  }
+
+  @Native<Bool Function(Pointer<Void>, Double, Double)>(
+    symbol: 'RSuperellipse::contains',
+    isLeaf: true,
+  )
+  external bool _contains(double x, double y);
+}
+
 /// A transform consisting of a translation, a rotation, and a uniform scale.
 ///
 /// Used by [Canvas.drawAtlas]. This is a more efficient way to represent these

@@ -10,6 +10,7 @@ import 'dart:math';
 
 import 'package:async/async.dart';
 import 'package:http_multi_server/http_multi_server.dart';
+import 'package:image/image.dart';
 import 'package:package_config/package_config.dart';
 import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
@@ -18,6 +19,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_packages_handler/shelf_packages_handler.dart';
 import 'package:shelf_static/shelf_static.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
+import 'package:skia_gold_client/skia_gold_client.dart';
 import 'package:stream_channel/stream_channel.dart';
 
 import 'package:test_core/backend.dart' hide Compiler;
@@ -29,6 +31,7 @@ import 'package:test_core/src/util/io.dart';
 import 'package:test_core/src/util/stack_trace_mapper.dart';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_test_utils/image_compare.dart';
 
 import 'browser.dart';
 import 'environment.dart' as env;
@@ -48,7 +51,9 @@ class BrowserPlatform extends PlatformPlugin {
     required this.server,
     required this.isDebug,
     required this.isVerbose,
+    required this.doUpdateScreenshotGoldens,
     required this.packageConfig,
+    required this.skiaClient,
     required this.overridePathToCanvasKit,
   }) {
     // The cascade of request handlers.
@@ -82,6 +87,7 @@ class BrowserPlatform extends PlatformPlugin {
         // Serves absolute package URLs (i.e. not /packages/* but /Users/user/*/hosted/pub.dartlang.org/*).
         // This handler goes last, after all more specific handlers failed to handle the request.
         .add(_createAbsolutePackageUrlHandler())
+        .add(_screenshotHandler)
         // Generates and serves a test payload of given length, split into chunks
         // of given size. Reponds to requests to /long_test_payload.
         .add(_testPayloadGenerator)
@@ -95,9 +101,13 @@ class BrowserPlatform extends PlatformPlugin {
   ///
   /// [browserEnvironment] provides the browser environment to run the test.
   ///
+  /// If [doUpdateScreenshotGoldens] is true updates screenshot golden files
+  /// instead of failing the test on screenshot mismatches.
   static Future<BrowserPlatform> start(
     TestSuite suite, {
     required BrowserEnvironment browserEnvironment,
+    required bool doUpdateScreenshotGoldens,
+    required SkiaGoldClient? skiaClient,
     required String? overridePathToCanvasKit,
     required bool isVerbose,
   }) async {
@@ -108,7 +118,9 @@ class BrowserPlatform extends PlatformPlugin {
       server: server,
       isDebug: Configuration.current.pauseAfterLoad,
       isVerbose: isVerbose,
+      doUpdateScreenshotGoldens: doUpdateScreenshotGoldens,
       packageConfig: await loadPackageConfigUri((await Isolate.packageConfig)!),
+      skiaClient: skiaClient,
       overridePathToCanvasKit: overridePathToCanvasKit,
     );
   }
@@ -141,9 +153,16 @@ class BrowserPlatform extends PlatformPlugin {
   /// Whether [close] has been called.
   bool get _closed => _closeMemo.hasRun;
 
+  /// Whether to update screenshot golden files.
+  final bool doUpdateScreenshotGoldens;
+
   late final shelf.Handler _packageUrlHandler = packagesDirHandler();
 
   final PackageConfig packageConfig;
+
+  /// A client for communicating with the Skia Gold backend to fetch, compare
+  /// and update images.
+  final SkiaGoldClient? skiaClient;
 
   final String? overridePathToCanvasKit;
 
@@ -346,6 +365,57 @@ class BrowserPlatform extends PlatformPlugin {
     );
   }
 
+  Future<shelf.Response> _screenshotHandler(shelf.Request request) async {
+    if (!request.requestedUri.path.endsWith('/screenshot')) {
+      return shelf.Response.notFound('This request is not handled by the screenshot handler');
+    }
+
+    final String payload = await request.readAsString();
+    final requestData = json.decode(payload) as Map<String, dynamic>;
+    final filename = requestData['filename'] as String;
+
+    if (!(await browserManager).supportsScreenshots) {
+      if (isVerbose) {
+        print(
+          'Skipping screenshot check for $filename. Current browser/OS '
+          'combination does not support screenshots.',
+        );
+      }
+      return shelf.Response.ok(json.encode('OK'));
+    }
+
+    final region = requestData['region'] as Map<String, dynamic>;
+    final isCanvaskitTest = requestData['isCanvaskitTest'] as bool;
+    final String result = await _diffScreenshot(filename, region, isCanvaskitTest);
+    return shelf.Response.ok(json.encode(result));
+  }
+
+  Future<String> _diffScreenshot(
+    String filename,
+    Map<String, dynamic> region,
+    bool isCanvaskitTest,
+  ) async {
+    final regionAsRectange = Rectangle<num>(
+      region['x'] as num,
+      region['y'] as num,
+      region['width'] as num,
+      region['height'] as num,
+    );
+
+    // Take screenshot.
+    final Image screenshot = await (await browserManager).captureScreenshot(regionAsRectange);
+
+    return compareImage(
+      screenshot,
+      doUpdateScreenshotGoldens,
+      filename,
+      getSkiaGoldDirectoryForSuite(suite),
+      skiaClient,
+      isCanvaskitTest: isCanvaskitTest,
+      verbose: isVerbose,
+    );
+  }
+
   static const Map<String, String> contentTypes = <String, String>{
     '.js': 'text/javascript',
     '.mjs': 'text/javascript',
@@ -405,7 +475,6 @@ class BrowserPlatform extends PlatformPlugin {
     return switch (suite.runConfig.variant) {
       CanvasKitVariant.full => 'full',
       CanvasKitVariant.chromium => 'chromium',
-      CanvasKitVariant.experimentalWebParagraph => 'experimentalWebParagraph',
       null => 'auto',
     };
   }
@@ -460,6 +529,12 @@ class BrowserPlatform extends PlatformPlugin {
 <script>
   _flutter.loader.load({
     config: {
+      canvasKitVariant: "${getCanvasKitVariant()}",
+      canvasKitBaseUrl: "/canvaskit",
+      forceSingleThreadedSkwasm: ${suite.runConfig.forceSingleThreadedSkwasm},
+      wasmAllowList: ${jsonEncode(suite.runConfig.wasmAllowList)},
+      preferWebParagraph: ${suite.runConfig.enableWebParagraph},
+      enableWimp: ${suite.runConfig.enableWimp},
     },
   });
 </script>
@@ -1013,6 +1088,10 @@ class BrowserManager {
         assert(false);
     }
   }
+
+  bool get supportsScreenshots => _browser.supportsScreenshots;
+
+  Future<Image> captureScreenshot(Rectangle<num> region) => _browser.captureScreenshot(region);
 
   /// Closes the manager and releases any resources it owns, including closing
   /// the browser.

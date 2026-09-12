@@ -23,6 +23,8 @@ TEST_F(FileLoaderTest, CanonicalizesFileUrlCorrectly) {
 
   TaskRunners task_runners(GetCurrentTestName(),    //
                            GetCurrentTaskRunner(),  //
+                           GetCurrentTaskRunner(),  //
+                           GetCurrentTaskRunner(),  //
                            GetCurrentTaskRunner()   //
   );
   auto isolate = RunDartCodeInIsolate(vm_ref, settings, task_runners, "main",

@@ -39,8 +39,11 @@ class FlutterEngineTest : public AutoreleasePoolTest {
   FML_DISALLOW_COPY_AND_ASSIGN(FlutterEngineTest);
 };
 
+// Returns a mock FlutterEngine that is able to work in environments
+// without a real pasteboard.
+//
 // Callers MUST call [mockEngine shutDownEngine] when finished with the returned engine.
-id CreateMockFlutterEngine();
+id CreateMockFlutterEngine(NSString* pasteboardString);
 
 class MockFlutterEngineTest : public AutoreleasePoolTest {
  public:

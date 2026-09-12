@@ -9,14 +9,145 @@
 
 #include "flutter/common/task_runners.h"
 #include "flutter/fml/synchronization/waitable_event.h"
+#include "flutter/lib/ui/painting/vertices.h"
+#include "flutter/lib/ui/window/platform_configuration.h"
+#include "flutter/runtime/dart_vm.h"
 #include "flutter/shell/common/shell_test.h"
+#include "flutter/shell/common/thread_host.h"
+#include "flutter/testing/testing.h"
+#include "gmock/gmock.h"
 #include "googletest/googletest/include/gtest/gtest.h"
 #include "third_party/dart/runtime/include/dart_api.h"
+#include "tonic/converter/dart_converter.h"
 
 namespace flutter {
 namespace testing {
 
 class PlatformConfigurationTest : public ShellTest {};
+
+TEST_F(PlatformConfigurationTest, Initialization) {
+  auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();
+
+  auto nativeValidateConfiguration =
+      [message_latch](Dart_NativeArguments args) {
+        PlatformConfiguration* configuration =
+            UIDartState::Current()->platform_configuration();
+        ASSERT_NE(configuration->GetMetrics(0), nullptr);
+        ASSERT_EQ(configuration->GetMetrics(0)->device_pixel_ratio, 1.0);
+        ASSERT_EQ(configuration->GetMetrics(0)->physical_width, 0.0);
+        ASSERT_EQ(configuration->GetMetrics(0)->physical_height, 0.0);
+
+        message_latch->Signal();
+      };
+
+  Settings settings = CreateSettingsForFixture();
+  TaskRunners task_runners("test",                  // label
+                           GetCurrentTaskRunner(),  // platform
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
+  );
+
+  AddNativeCallback("ValidateConfiguration",
+                    CREATE_NATIVE_ENTRY(nativeValidateConfiguration));
+
+  std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
+
+  ASSERT_TRUE(shell->IsSetup());
+  auto run_configuration = RunConfiguration::InferFromSettings(settings);
+  run_configuration.SetEntrypoint("validateConfiguration");
+
+  shell->RunEngine(std::move(run_configuration), [&](auto result) {
+    ASSERT_EQ(result, Engine::RunStatus::Success);
+  });
+
+  message_latch->Wait();
+  DestroyShell(std::move(shell), task_runners);
+}
+
+TEST_F(PlatformConfigurationTest, WindowMetricsUpdate) {
+  auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();
+
+  auto nativeValidateConfiguration =
+      [message_latch](Dart_NativeArguments args) {
+        PlatformConfiguration* configuration =
+            UIDartState::Current()->platform_configuration();
+
+        ASSERT_NE(configuration->GetMetrics(0), nullptr);
+        bool has_view = configuration->UpdateViewMetrics(
+            0, ViewportMetrics{2.0, 10.0, 20.0, 22, 0});
+        ASSERT_TRUE(has_view);
+        ASSERT_EQ(configuration->GetMetrics(0)->device_pixel_ratio, 2.0);
+        ASSERT_EQ(configuration->GetMetrics(0)->physical_width, 10.0);
+        ASSERT_EQ(configuration->GetMetrics(0)->physical_height, 20.0);
+        ASSERT_EQ(configuration->GetMetrics(0)->physical_touch_slop, 22);
+
+        message_latch->Signal();
+      };
+
+  Settings settings = CreateSettingsForFixture();
+  TaskRunners task_runners("test",                  // label
+                           GetCurrentTaskRunner(),  // platform
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
+  );
+
+  AddNativeCallback("ValidateConfiguration",
+                    CREATE_NATIVE_ENTRY(nativeValidateConfiguration));
+
+  std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
+
+  ASSERT_TRUE(shell->IsSetup());
+  auto run_configuration = RunConfiguration::InferFromSettings(settings);
+  run_configuration.SetEntrypoint("validateConfiguration");
+
+  shell->RunEngine(std::move(run_configuration), [&](auto result) {
+    ASSERT_EQ(result, Engine::RunStatus::Success);
+  });
+
+  message_latch->Wait();
+  DestroyShell(std::move(shell), task_runners);
+}
+
+TEST_F(PlatformConfigurationTest, GetWindowReturnsNullForNonexistentId) {
+  auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();
+
+  auto nativeValidateConfiguration =
+      [message_latch](Dart_NativeArguments args) {
+        PlatformConfiguration* configuration =
+            UIDartState::Current()->platform_configuration();
+
+        ASSERT_EQ(configuration->GetMetrics(1), nullptr);
+        ASSERT_EQ(configuration->GetMetrics(2), nullptr);
+
+        message_latch->Signal();
+      };
+
+  Settings settings = CreateSettingsForFixture();
+  TaskRunners task_runners("test",                  // label
+                           GetCurrentTaskRunner(),  // platform
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
+  );
+
+  AddNativeCallback("ValidateConfiguration",
+                    CREATE_NATIVE_ENTRY(nativeValidateConfiguration));
+
+  std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
+
+  ASSERT_TRUE(shell->IsSetup());
+  auto run_configuration = RunConfiguration::InferFromSettings(settings);
+  run_configuration.SetEntrypoint("validateConfiguration");
+
+  shell->RunEngine(std::move(run_configuration), [&](auto result) {
+    ASSERT_EQ(result, Engine::RunStatus::Success);
+  });
+
+  message_latch->Wait();
+  DestroyShell(std::move(shell), task_runners);
+}
 
 TEST_F(PlatformConfigurationTest, OnErrorHandlesError) {
   auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();
@@ -37,7 +168,9 @@ TEST_F(PlatformConfigurationTest, OnErrorHandlesError) {
 
   TaskRunners task_runners("test",                  // label
                            GetCurrentTaskRunner(),  // platform
-                           CreateNewThread()        // ui
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
   );
 
   std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
@@ -85,7 +218,9 @@ TEST_F(PlatformConfigurationTest, OnErrorDoesNotHandleError) {
 
   TaskRunners task_runners("test",                  // label
                            GetCurrentTaskRunner(),  // platform
-                           CreateNewThread()        // ui
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
   );
 
   std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
@@ -134,7 +269,9 @@ TEST_F(PlatformConfigurationTest, OnErrorThrows) {
 
   TaskRunners task_runners("test",                  // label
                            GetCurrentTaskRunner(),  // platform
-                           CreateNewThread()        // ui
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
   );
 
   std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
@@ -180,7 +317,9 @@ TEST_F(PlatformConfigurationTest, SetDartPerformanceMode) {
 
   TaskRunners task_runners("test",                  // label
                            GetCurrentTaskRunner(),  // platform
-                           CreateNewThread()        // ui
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
   );
 
   std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
@@ -194,6 +333,90 @@ TEST_F(PlatformConfigurationTest, SetDartPerformanceMode) {
   });
 
   message_latch->Wait();
+  DestroyShell(std::move(shell), task_runners);
+}
+
+TEST_F(PlatformConfigurationTest, BeginFrameMonotonic) {
+  auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();
+
+  PlatformConfiguration* platform;
+
+  // Called at the load time and will be in an Dart isolate.
+  auto nativeValidateConfiguration = [message_latch,
+                                      &platform](Dart_NativeArguments args) {
+    platform = UIDartState::Current()->platform_configuration();
+
+    // Hijacks the `_begin_frame` in hooks.dart so we can get a callback for
+    // validation.
+    auto field =
+        Dart_GetField(Dart_RootLibrary(), tonic::ToDart("_beginFrameHijack"));
+    platform->begin_frame_.Clear();
+    platform->begin_frame_.Set(UIDartState::Current(), field);
+
+    message_latch->Signal();
+  };
+  AddNativeCallback("ValidateConfiguration",
+                    CREATE_NATIVE_ENTRY(nativeValidateConfiguration));
+
+  std::vector<int64_t> frame_times;
+  std::vector<uint64_t> frame_numbers;
+
+  auto frame_latch = std::make_shared<fml::AutoResetWaitableEvent>();
+
+  // Called for each `_begin_frame` that is hijacked.
+  auto nativeBeginFrame = [frame_latch, &frame_times,
+                           &frame_numbers](Dart_NativeArguments args) {
+    int64_t microseconds;
+    uint64_t frame_number;
+    Dart_IntegerToInt64(Dart_GetNativeArgument(args, 0), &microseconds);
+    Dart_IntegerToUint64(Dart_GetNativeArgument(args, 1), &frame_number);
+
+    frame_times.push_back(microseconds);
+    frame_numbers.push_back(frame_number);
+
+    if (frame_times.size() == 3) {
+      frame_latch->Signal();
+    }
+  };
+  AddNativeCallback("BeginFrame", CREATE_NATIVE_ENTRY(nativeBeginFrame));
+
+  Settings settings = CreateSettingsForFixture();
+  TaskRunners task_runners("test",                  // label
+                           GetCurrentTaskRunner(),  // platform
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
+  );
+
+  std::unique_ptr<Shell> shell = CreateShell(settings, task_runners);
+  ASSERT_TRUE(shell->IsSetup());
+
+  auto configuration = RunConfiguration::InferFromSettings(settings);
+  configuration.SetEntrypoint("validateConfiguration");
+
+  shell->RunEngine(std::move(configuration), [&](auto result) {
+    ASSERT_EQ(result, Engine::RunStatus::Success);
+  });
+
+  // Wait for `nativeValidateConfiguration` to get called.
+  message_latch->Wait();
+
+  fml::TaskRunner::RunNowOrPostTask(
+      shell->GetTaskRunners().GetUITaskRunner(), [platform]() {
+        auto offset = fml::TimeDelta::FromMilliseconds(10);
+        auto zero = fml::TimePoint();
+        auto one = zero + offset;
+        auto two = one + offset;
+
+        platform->BeginFrame(zero, 1);
+        platform->BeginFrame(two, 2);
+        platform->BeginFrame(one, 3);
+      });
+
+  frame_latch->Wait();
+
+  ASSERT_THAT(frame_times, ::testing::ElementsAre(0, 20000, 20000));
+  ASSERT_THAT(frame_numbers, ::testing::ElementsAre(1, 2, 3));
   DestroyShell(std::move(shell), task_runners);
 }
 

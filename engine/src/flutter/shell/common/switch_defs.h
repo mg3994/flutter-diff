@@ -104,9 +104,19 @@ DEF_SWITCH(EndlessTraceBuffer,
            "This is useful when very old events need to viewed. For example, "
            "during application launch. Memory usage will continue to grow "
            "indefinitely however.")
+DEF_SWITCH(EnableSoftwareRendering,
+           "enable-software-rendering",
+           "Enable rendering using the Skia software backend. This is useful "
+           "when testing Flutter on emulators. By default, Flutter will "
+           "attempt to either use OpenGL, Metal, or Vulkan.")
 DEF_SWITCH(Route,
            "route",
            "Start app with an specific route defined on the framework")
+DEF_SWITCH(SkiaDeterministicRendering,
+           "skia-deterministic-rendering",
+           "Skips the call to SkGraphics::Init(), thus avoiding swapping out "
+           "some Skia function pointers based on available CPU features. This "
+           "is used to obtain 100% deterministic behavior in Skia rendering.")
 DEF_SWITCH(FlutterAssetsDir,
            "flutter-assets-dir",
            "Path to the Flutter assets directory.")
@@ -116,6 +126,9 @@ DEF_SWITCH(DisableServiceAuthCodes,
            "disable-service-auth-codes",
            "Disable the requirement for authentication codes for communicating"
            " with the VM service.")
+DEF_SWITCH(DisableServiceOriginCheck,
+           "disable-service-origin-check",
+           "Disable the WebSocket origin check for the VM service.")
 DEF_SWITCH(EnableServicePortFallback,
            "enable-service-port-fallback",
            "Allow the VM service to fallback to automatic port selection if"
@@ -128,6 +141,15 @@ DEF_SWITCH(TraceStartup,
            "trace-startup",
            "Trace early application lifecycle. Automatically switches to an "
            "endless trace buffer.")
+DEF_SWITCH(TraceSkia,
+           "trace-skia",
+           "Trace Skia calls. This is useful when debugging the GPU threed."
+           "By default, Skia tracing is not enabled to reduce the number of "
+           "traced events")
+DEF_SWITCH(TraceSkiaAllowlist,
+           "trace-skia-allowlist",
+           "Filters out all Skia trace event categories except those that are "
+           "specified in this comma separated list.")
 DEF_SWITCH(
     TraceAllowlist,
     "trace-allowlist",
@@ -197,12 +219,6 @@ DEF_SWITCH(DisableDartAsserts,
            "disabled. This flag may be specified if the user wishes to run "
            "with assertions disabled in the debug product mode (i.e. with JIT "
            "or DBC).")
-DEF_SWITCH(EnableSerialGC,
-           "enable-serial-gc",
-           "On low power devices with low core counts, running concurrent "
-           "GC tasks on threads can cause them to contend with the UI thread "
-           "which could potentially lead to jank. This option turns off all "
-           "concurrent GC activities")
 DEF_SWITCH(DisallowInsecureConnections,
            "disallow-insecure-connections",
            "By default, dart:io allows all socket connections. If this switch "
@@ -265,9 +281,10 @@ DEF_SWITCH(MergedPlatformUIThread,
 DEF_SWITCH(DisableMergedPlatformUIThread,
            "no-enable-merged-platform-ui-thread",
            "Disables merging of the UI and platform threads.")
-DEF_SWITCH(EnableAndroidSurfaceControl,
-           "enable-surface-control",
-           "Enable the SurfaceControl backed swapchain when supported.")
+DEF_SWITCH(EnableAndroidHcppAndSurfaceControl,
+           "enable-hcpp-and-surface-control",
+           "Enable the HCPP platform view mode and SurfaceControl backed "
+           "swapchain when supported.")
 DEF_SWITCH(EnableFlutterGPU,
            "enable-flutter-gpu",
            "Whether Flutter GPU is enabled.")
@@ -275,9 +292,9 @@ DEF_SWITCH(ImpellerLazyShaderMode,
            "impeller-lazy-shader-mode",
            "Whether to defer initialization of all required PSOs for the "
            "Impeller backend. Defaults to false.")
-DEF_SWITCH(ImpellerAntialiasLines,
-           "impeller-antialias-lines",
-           "Experimental flag to test drawing lines with antialiasing.")
+DEF_SWITCH(ImpellerUseSDFs,
+           "impeller-use-sdfs",
+           "Whether to use SDFs for rendering in Impeller.")
 DEF_SWITCHES_END
 
 }  // namespace flutter

@@ -74,14 +74,40 @@ class CopyArtifactsStep implements PipelineStep {
   @override
   Future<void> run() async {
     final String flutterJsSourceDirectory;
+    final String canvaskitWebParagraphSourceDirectory;
+    final String canvaskitSourceDirectory;
+    final String canvaskitChromiumSourceDirectory;
+    final String skwasmSourceDirectory;
+    final String skwasmHeavySourceDirectory;
     switch (source) {
       case LocalArtifactSource(:final RuntimeMode mode):
         final String buildDirectory = getBuildDirectoryForRuntimeMode(mode).path;
         flutterJsSourceDirectory = pathlib.join(buildDirectory, 'flutter_web_sdk', 'flutter_js');
+        canvaskitWebParagraphSourceDirectory = pathlib.join(
+          buildDirectory,
+          'canvaskit_webparagraph',
+        );
+        canvaskitSourceDirectory = pathlib.join(buildDirectory, 'canvaskit');
+        canvaskitChromiumSourceDirectory = pathlib.join(buildDirectory, 'canvaskit_chromium');
+        skwasmSourceDirectory = pathlib.join(buildDirectory, 'skwasm');
+        skwasmHeavySourceDirectory = pathlib.join(buildDirectory, 'skwasm_heavy');
 
       case GcsArtifactSource(:final LuciRealm realm):
         final String artifactsDirectory = (await _downloadArtifacts(realm)).path;
         flutterJsSourceDirectory = pathlib.join(artifactsDirectory, 'flutter_js');
+        canvaskitWebParagraphSourceDirectory = pathlib.join(
+          artifactsDirectory,
+          'canvaskit',
+          'webparagraph',
+        );
+        canvaskitSourceDirectory = pathlib.join(artifactsDirectory, 'canvaskit');
+        canvaskitChromiumSourceDirectory = pathlib.join(
+          artifactsDirectory,
+          'canvaskit',
+          'chromium',
+        );
+        skwasmSourceDirectory = pathlib.join(artifactsDirectory, 'canvaskit');
+        skwasmHeavySourceDirectory = pathlib.join(artifactsDirectory, 'canvaskit');
     }
 
     await environment.webTestsArtifactsDir.create(recursive: true);
@@ -90,8 +116,27 @@ class CopyArtifactsStep implements PipelineStep {
     await copySkiaTestImages();
     await copyFlutterJsFiles(flutterJsSourceDirectory);
     final copied = <String>[];
-    if (artifactDeps.canvasKitExperimentalWebParagraph) {
-      copied.add('CanvasKit (Experimental Web Paragraph)');
+    if (artifactDeps.canvasKitWebParagraph) {
+      copied.add('CanvasKit (Web Paragraph)');
+      await copyWasmLibrary(
+        'canvaskit',
+        canvaskitWebParagraphSourceDirectory,
+        'canvaskit/webparagraph',
+      );
+    }
+    if (artifactDeps.canvasKit) {
+      copied.add('CanvasKit');
+      await copyWasmLibrary('canvaskit', canvaskitSourceDirectory, 'canvaskit');
+    }
+    if (artifactDeps.canvasKitChromium) {
+      copied.add('CanvasKit (Chromium)');
+      await copyWasmLibrary('canvaskit', canvaskitChromiumSourceDirectory, 'canvaskit/chromium');
+    }
+    if (artifactDeps.skwasm) {
+      copied.add('Skwasm');
+      await copyWasmLibrary('skwasm', skwasmSourceDirectory, 'canvaskit');
+      await copyWasmLibrary('skwasm_heavy', skwasmHeavySourceDirectory, 'canvaskit');
+      await copyWasmLibrary('wimp', skwasmSourceDirectory, 'canvaskit');
     }
     print('Copied artifacts: ${copied.join(', ')}');
   }

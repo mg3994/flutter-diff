@@ -502,11 +502,8 @@ class FakeMacOSProject extends Fake implements MacOSProject {
       hostAppRoot.childDirectory('Runner.xcodeproj').childFile('project.pbxproj');
 
   @override
-  Directory get ephemeralDirectory =>
-      hostAppRoot.childDirectory('Flutter').childDirectory('ephemeral');
-
-  @override
-  Directory get flutterSwiftPackagesDirectory => ephemeralDirectory.childDirectory('Packages');
+  Directory get flutterSwiftPackagesDirectory =>
+      hostAppRoot.childDirectory('Flutter').childDirectory('ephemeral').childDirectory('Packages');
 
   @override
   Directory get relativeSwiftPackagesDirectory =>
@@ -554,11 +551,8 @@ class FakeIosProject extends Fake implements IosProject {
       hostAppRoot.childDirectory('Runner.xcodeproj').childFile('project.pbxproj');
 
   @override
-  Directory get ephemeralDirectory =>
-      hostAppRoot.childDirectory('Flutter').childDirectory('ephemeral');
-
-  @override
-  Directory get flutterSwiftPackagesDirectory => ephemeralDirectory.childDirectory('Packages');
+  Directory get flutterSwiftPackagesDirectory =>
+      hostAppRoot.childDirectory('Flutter').childDirectory('ephemeral').childDirectory('Packages');
 
   @override
   Directory get relativeSwiftPackagesDirectory =>

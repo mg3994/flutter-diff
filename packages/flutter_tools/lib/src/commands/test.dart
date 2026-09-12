@@ -101,19 +101,17 @@ class TestCommand extends FlutterCommand with DeviceBasedDevelopmentArtifacts {
         valueHelp: 'substring',
         splitCommas: false,
       )
-      ..addMultiOption(
+      ..addOption(
         'tags',
         abbr: 't',
         help:
             'Run only tests associated with the specified tags. See: https://pub.dev/packages/test#tagging-tests',
-        splitCommas: false,
       )
-      ..addMultiOption(
+      ..addOption(
         'exclude-tags',
         abbr: 'x',
         help:
             'Run only tests that do not have the specified tags. See: https://pub.dev/packages/test#tagging-tests',
-        splitCommas: false,
       )
       ..addFlag(
         'start-paused',
@@ -430,8 +428,8 @@ class TestCommand extends FlutterCommand with DeviceBasedDevelopmentArtifacts {
     final bool buildTestAssets = boolArg('test-assets');
     final List<String> names = stringsArg('name');
     final List<String> plainNames = stringsArg('plain-name');
-    final List<String> tags = stringsArg('tags');
-    final List<String> excludeTags = stringsArg('exclude-tags');
+    final String? tags = stringArg('tags');
+    final String? excludeTags = stringArg('exclude-tags');
     final BuildInfo buildInfo = await getBuildInfo(
       forcedBuildMode: BuildMode.debug,
       forcedUseLocalCanvasKit: true,

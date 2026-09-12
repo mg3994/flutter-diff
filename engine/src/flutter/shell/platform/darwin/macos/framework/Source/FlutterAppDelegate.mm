@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #import "flutter/shell/platform/darwin/macos/framework/Headers/FlutterAppDelegate.h"
+#import "flutter/shell/platform/darwin/macos/framework/Source/FlutterAppDelegate_Internal.h"
 
 #import <AppKit/AppKit.h>
 
@@ -25,6 +26,7 @@
 
 - (instancetype)init {
   if (self = [super init]) {
+    _terminationHandler = nil;
     _lifecycleRegistrar = [[FlutterAppLifecycleRegistrar alloc] init];
   }
   return self;
@@ -73,7 +75,21 @@
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication* _Nonnull)sender {
-  return NSTerminateNow;
+  // If the framework has already told us to terminate, terminate immediately.
+  if ([self terminationHandler] == nil || [[self terminationHandler] shouldTerminate]) {
+    return NSTerminateNow;
+  }
+
+  // Send a termination request to the framework.
+  FlutterEngineTerminationHandler* terminationHandler = [self terminationHandler];
+  [terminationHandler requestApplicationTermination:sender
+                                           exitType:kFlutterAppExitTypeCancelable
+                                             result:nil];
+
+  // Cancel termination to allow the framework to handle the request asynchronously. When the
+  // termination request returns from the app, if termination is desired, this method will be
+  // reinvoked with self.terminationHandler.shouldTerminate set to YES.
+  return NSTerminateCancel;
 }
 
 @end

@@ -7,7 +7,6 @@
 #include "flutter/testing/fixture_test.h"
 #include "flutter/testing/testing.h"
 #include "flutter/third_party/tonic/converter/dart_converter.h"
-#include "third_party/tonic/logging/dart_invoke.h"
 
 // CREATE_NATIVE_ENTRY is leaky by design
 // NOLINTBEGIN(clang-analyzer-core.StackAddressEscape)
@@ -29,7 +28,7 @@ class TypeConversionsTest : public FixtureTest {
     }
     auto thread = CreateNewThread();
     TaskRunners single_threaded_task_runner(GetCurrentTestName(), thread,
-                                            thread);
+                                            thread, thread, thread);
     auto isolate =
         RunDartCodeInIsolate(vm_, settings_, single_threaded_task_runner,
                              entrypoint, {}, GetDefaultKernelFilePath());

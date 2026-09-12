@@ -18,6 +18,15 @@ FlutterEngine::FlutterEngine(const DartProject& project) {
   c_engine_properties.icu_data_path = project.icu_data_path().c_str();
   c_engine_properties.aot_library_path = project.aot_library_path().c_str();
   c_engine_properties.dart_entrypoint = project.dart_entrypoint().c_str();
+  c_engine_properties.gpu_preference =
+      static_cast<FlutterDesktopGpuPreference>(project.gpu_preference());
+  c_engine_properties.ui_thread_policy =
+      static_cast<FlutterDesktopUIThreadPolicy>(project.ui_thread_policy());
+  c_engine_properties.accessibility_mode =
+      static_cast<FlutterDesktopAccessibilityMode>(
+          project.accessibility_mode());
+  c_engine_properties.impeller_switch =
+      static_cast<FlutterDesktopImpellerSwitch>(project.impeller_switch());
 
   const std::vector<std::string>& entrypoint_args =
       project.dart_entrypoint_arguments();
@@ -70,6 +79,14 @@ void FlutterEngine::ShutDown() {
   engine_ = nullptr;
 }
 
+std::chrono::nanoseconds FlutterEngine::ProcessMessages() {
+  return std::chrono::nanoseconds(FlutterDesktopEngineProcessMessages(engine_));
+}
+
+void FlutterEngine::ReloadSystemFonts() {
+  FlutterDesktopEngineReloadSystemFonts(engine_);
+}
+
 FlutterDesktopPluginRegistrarRef FlutterEngine::GetRegistrarForPlugin(
     const std::string& plugin_name) {
   if (!engine_) {
@@ -79,6 +96,60 @@ FlutterDesktopPluginRegistrarRef FlutterEngine::GetRegistrarForPlugin(
     return nullptr;
   }
   return FlutterDesktopEngineGetPluginRegistrar(engine_, plugin_name.c_str());
+}
+
+void FlutterEngine::SetNextFrameCallback(std::function<void()> callback) {
+  next_frame_callback_ = std::move(callback);
+  FlutterDesktopEngineSetNextFrameCallback(
+      engine_,
+      [](void* user_data) {
+        FlutterEngine* self = static_cast<FlutterEngine*>(user_data);
+        self->next_frame_callback_();
+        self->next_frame_callback_ = nullptr;
+      },
+      this);
+}
+
+bool FlutterEngine::IsPlatformThread() const {
+  if (!engine_) {
+    std::cerr
+        << "Cannot check platform thread on an engine that failed creation."
+        << std::endl;
+    return false;
+  }
+  return FlutterDesktopEngineIsPlatformThread(engine_);
+}
+
+void FlutterEngine::PostPlatformThreadTask(std::function<void()> callback) {
+  if (!callback) {
+    return;
+  }
+  FlutterDesktopEnginePostPlatformThreadTask(
+      engine_,
+      /*callback=*/
+      [](void* user_data) {
+        std::unique_ptr<std::function<void()>> cb{
+            static_cast<std::function<void()>*>(user_data)};
+        (*cb)();
+      },
+      /*on_cancel=*/
+      [](void* user_data) {
+        delete static_cast<std::function<void()>*>(user_data);
+      },
+      /*user_data=*/new std::function<void()>(std::move(callback)));
+}
+
+std::optional<LRESULT> FlutterEngine::ProcessExternalWindowMessage(
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam) {
+  LRESULT result;
+  if (FlutterDesktopEngineProcessExternalWindowMessage(
+          engine_, hwnd, message, wparam, lparam, &result)) {
+    return result;
+  }
+  return std::nullopt;
 }
 
 FlutterDesktopEngineRef FlutterEngine::RelinquishEngine() {

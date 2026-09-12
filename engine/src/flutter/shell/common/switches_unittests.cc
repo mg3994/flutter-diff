@@ -20,14 +20,35 @@ TEST(SwitchesTest, SkiaTraceAllowlistFlag) {
   fml::CommandLine command_line =
       fml::CommandLineFromInitializerList({"command"});
   Settings settings = SettingsFromCommandLine(command_line);
+#if !FLUTTER_RELEASE
+  EXPECT_TRUE(settings.trace_skia);
+  EXPECT_TRUE(settings.trace_skia_allowlist.has_value());
+  EXPECT_EQ(settings.trace_skia_allowlist->size(), 1ul);
+#else
+  EXPECT_FALSE(settings.trace_skia);
+#endif
 
   command_line =
       fml::CommandLineFromInitializerList({"command", "--trace-skia"});
   settings = SettingsFromCommandLine(command_line);
+#if !FLUTTER_RELEASE
+  EXPECT_TRUE(settings.trace_skia);
+  EXPECT_FALSE(settings.trace_skia_allowlist.has_value());
+#else
+  EXPECT_FALSE(settings.trace_skia);
+#endif
 
   command_line = fml::CommandLineFromInitializerList(
       {"command", "--trace-skia-allowlist=aaa,bbb,ccc"});
   settings = SettingsFromCommandLine(command_line);
+#if !FLUTTER_RELEASE
+  EXPECT_TRUE(settings.trace_skia);
+  EXPECT_TRUE(settings.trace_skia_allowlist.has_value());
+  EXPECT_EQ(settings.trace_skia_allowlist->size(), 3ul);
+  EXPECT_EQ(settings.trace_skia_allowlist->back(), "ccc");
+#else
+  EXPECT_FALSE(settings.trace_skia);
+#endif
 }
 
 TEST(SwitchesTest, TraceToFile) {
@@ -63,6 +84,42 @@ TEST(SwitchesTest, RouteParsedFlag) {
   command_line = fml::CommandLineFromInitializerList({"command", "--route"});
   settings = SettingsFromCommandLine(command_line);
   EXPECT_TRUE(settings.route.empty());
+}
+
+TEST(SwitchesTest, EnableEmbedderAPI) {
+  {
+    // enable
+    fml::CommandLine command_line = fml::CommandLineFromInitializerList(
+        {"command", "--enable-embedder-api"});
+    Settings settings = SettingsFromCommandLine(command_line);
+    EXPECT_EQ(settings.enable_embedder_api, true);
+  }
+  {
+    // default
+    fml::CommandLine command_line =
+        fml::CommandLineFromInitializerList({"command"});
+    Settings settings = SettingsFromCommandLine(command_line);
+    EXPECT_EQ(settings.enable_embedder_api, false);
+  }
+}
+
+TEST(SwitchesTest, NoEnableImpeller) {
+  {
+    // enable
+    fml::CommandLine command_line =
+        fml::CommandLineFromInitializerList({"command", "--enable-impeller"});
+    EXPECT_TRUE(command_line.HasOption("enable-impeller"));
+    Settings settings = SettingsFromCommandLine(command_line);
+    EXPECT_EQ(settings.enable_impeller, true);
+  }
+  {
+    // disable
+    fml::CommandLine command_line = fml::CommandLineFromInitializerList(
+        {"command", "--enable-impeller=false"});
+    EXPECT_TRUE(command_line.HasOption("enable-impeller"));
+    Settings settings = SettingsFromCommandLine(command_line);
+    EXPECT_EQ(settings.enable_impeller, false);
+  }
 }
 
 TEST(SwitchesTest, ProfileStartup) {
@@ -103,6 +160,19 @@ TEST(SwitchesTest, RequireMergedPlatformUIThread) {
   EXPECT_DEATH_IF_SUPPORTED(SettingsFromCommandLine(command_line, true),
                             "This platform does not support the "
                             "merged-platform-ui-thread=disabled flag");
+}
+
+// Ensure mergeAfterLaunch is passed correctly.
+//
+// This is a supported threading model even on some platforms (e.g. Android)
+// that enforce a merged platform/UI thread. For embedders where this isn't a
+// supported behavior, it can be blocked in the embedder itself.
+TEST(SwitchesTest, RequireMergedPlatformUIThreadAllowsMergeAfterLaunch) {
+  fml::CommandLine command_line = fml::CommandLineFromInitializerList(
+      {"command", "--merged-platform-ui-thread=mergeAfterLaunch"});
+  Settings settings = SettingsFromCommandLine(command_line, true);
+  EXPECT_EQ(settings.merged_platform_ui_thread,
+            Settings::MergedPlatformUIThread::kMergeAfterLaunch);
 }
 #endif  // !OS_FUCHSIA
 

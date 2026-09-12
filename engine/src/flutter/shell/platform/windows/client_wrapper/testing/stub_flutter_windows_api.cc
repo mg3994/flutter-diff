@@ -35,6 +35,62 @@ ScopedStubFlutterWindowsApi::~ScopedStubFlutterWindowsApi() {
 
 // Forwarding dummy implementations of the C API.
 
+FlutterDesktopViewControllerRef FlutterDesktopViewControllerCreate(
+    int width,
+    int height,
+    FlutterDesktopEngineRef engine) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->ViewControllerCreate(width, height, engine);
+  }
+  return nullptr;
+}
+
+void FlutterDesktopViewControllerDestroy(
+    FlutterDesktopViewControllerRef controller) {
+  if (s_stub_implementation) {
+    s_stub_implementation->ViewControllerDestroy();
+  }
+}
+
+FlutterDesktopViewId FlutterDesktopViewControllerGetViewId(
+    FlutterDesktopViewControllerRef controller) {
+  // The stub ignores this, so just return an arbitrary non-zero value.
+  return static_cast<FlutterDesktopViewId>(1);
+}
+
+FlutterDesktopEngineRef FlutterDesktopViewControllerGetEngine(
+    FlutterDesktopViewControllerRef controller) {
+  // The stub ignores this, so just return an arbitrary non-zero value.
+  return reinterpret_cast<FlutterDesktopEngineRef>(1);
+}
+
+FlutterDesktopViewRef FlutterDesktopViewControllerGetView(
+    FlutterDesktopViewControllerRef controller) {
+  // The stub ignores this, so just return an arbitrary non-zero value.
+  return reinterpret_cast<FlutterDesktopViewRef>(1);
+}
+
+void FlutterDesktopViewControllerForceRedraw(
+    FlutterDesktopViewControllerRef controller) {
+  if (s_stub_implementation) {
+    s_stub_implementation->ViewControllerForceRedraw();
+  }
+}
+
+bool FlutterDesktopViewControllerHandleTopLevelWindowProc(
+    FlutterDesktopViewControllerRef controller,
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam,
+    LRESULT* result) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->ViewControllerHandleTopLevelWindowProc(
+        hwnd, message, wparam, lparam, result);
+  }
+  return false;
+}
+
 FlutterDesktopEngineRef FlutterDesktopEngineCreate(
     const FlutterDesktopEngineProperties* engine_properties) {
   if (s_stub_implementation) {
@@ -58,11 +114,41 @@ bool FlutterDesktopEngineRun(FlutterDesktopEngineRef engine,
   return true;
 }
 
+uint64_t FlutterDesktopEngineProcessMessages(FlutterDesktopEngineRef engine) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->EngineProcessMessages();
+  }
+  return 0;
+}
+
 void FlutterDesktopEngineSetNextFrameCallback(FlutterDesktopEngineRef engine,
                                               VoidCallback callback,
                                               void* user_data) {
   if (s_stub_implementation) {
     s_stub_implementation->EngineSetNextFrameCallback(callback, user_data);
+  }
+}
+
+bool FlutterDesktopEngineIsPlatformThread(FlutterDesktopEngineRef engine) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->EngineIsPlatformThread();
+  }
+  return false;
+}
+
+void FlutterDesktopEnginePostPlatformThreadTask(FlutterDesktopEngineRef engine,
+                                                VoidCallback callback,
+                                                VoidCallback on_cancel,
+                                                void* user_data) {
+  if (s_stub_implementation) {
+    s_stub_implementation->EnginePostPlatformThreadTask(callback, on_cancel,
+                                                        user_data);
+  }
+}
+
+void FlutterDesktopEngineReloadSystemFonts(FlutterDesktopEngineRef engine) {
+  if (s_stub_implementation) {
+    s_stub_implementation->EngineReloadSystemFonts();
   }
 }
 
@@ -76,5 +162,104 @@ FlutterDesktopPluginRegistrarRef FlutterDesktopEngineGetPluginRegistrar(
 FlutterDesktopMessengerRef FlutterDesktopEngineGetMessenger(
     FlutterDesktopEngineRef engine) {
   // The stub ignores this, so just return an arbitrary non-zero value.
-  return s_stub_implementation->PluginRegistrarGetMessenger();
+  return reinterpret_cast<FlutterDesktopMessengerRef>(2);
+}
+
+FlutterDesktopTextureRegistrarRef FlutterDesktopEngineGetTextureRegistrar(
+    FlutterDesktopEngineRef engine) {
+  // The stub ignores this, so just return an arbitrary non-zero value.
+  return reinterpret_cast<FlutterDesktopTextureRegistrarRef>(3);
+}
+
+HWND FlutterDesktopViewGetHWND(FlutterDesktopViewRef controller) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->ViewGetHWND();
+  }
+  return reinterpret_cast<HWND>(-1);
+}
+
+IDXGIAdapter* FlutterDesktopViewGetGraphicsAdapter(FlutterDesktopViewRef view) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->ViewGetGraphicsAdapter();
+  }
+  return nullptr;
+}
+
+bool FlutterDesktopEngineGetGraphicsAdapter(FlutterDesktopEngineRef engine,
+                                            IDXGIAdapter** adapter_out) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->EngineGetGraphicsAdapter(adapter_out);
+  }
+  return false;
+}
+
+bool FlutterDesktopEngineProcessExternalWindowMessage(
+    FlutterDesktopEngineRef engine,
+    HWND hwnd,
+    UINT message,
+    WPARAM wparam,
+    LPARAM lparam,
+    LRESULT* result) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->EngineProcessExternalWindowMessage(
+        engine, hwnd, message, wparam, lparam, result);
+  }
+  return false;
+}
+
+void FlutterDesktopEngineRegisterPlatformViewType(
+    FlutterDesktopEngineRef engine,
+    const char* view_type_name,
+    FlutterPlatformViewTypeEntry view_type) {
+  if (s_stub_implementation) {
+    s_stub_implementation->EngineRegisterPlatformViewType(view_type_name,
+                                                          view_type);
+  }
+}
+
+FlutterDesktopViewRef FlutterDesktopPluginRegistrarGetView(
+    FlutterDesktopPluginRegistrarRef controller) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->PluginRegistrarGetView();
+  }
+  return nullptr;
+}
+
+FlutterDesktopViewRef FlutterDesktopPluginRegistrarGetViewById(
+    FlutterDesktopPluginRegistrarRef controller,
+    FlutterDesktopViewId view_id) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->PluginRegistrarGetViewById(view_id);
+  }
+  return nullptr;
+}
+
+bool FlutterDesktopPluginRegistrarGetGraphicsAdapter(
+    FlutterDesktopPluginRegistrarRef registrar,
+    IDXGIAdapter** adapter_out) {
+  if (s_stub_implementation) {
+    return s_stub_implementation->PluginRegistrarGetGraphicsAdapter(
+        adapter_out);
+  }
+  return false;
+}
+
+void FlutterDesktopPluginRegistrarRegisterTopLevelWindowProcDelegate(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopWindowProcCallback delegate,
+    void* user_data) {
+  if (s_stub_implementation) {
+    return s_stub_implementation
+        ->PluginRegistrarRegisterTopLevelWindowProcDelegate(delegate,
+                                                            user_data);
+  }
+}
+
+void FlutterDesktopPluginRegistrarUnregisterTopLevelWindowProcDelegate(
+    FlutterDesktopPluginRegistrarRef registrar,
+    FlutterDesktopWindowProcCallback delegate) {
+  if (s_stub_implementation) {
+    return s_stub_implementation
+        ->PluginRegistrarUnregisterTopLevelWindowProcDelegate(delegate);
+  }
 }

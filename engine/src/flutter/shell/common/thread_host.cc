@@ -4,9 +4,11 @@
 
 #include "flutter/shell/common/thread_host.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace flutter {
 
@@ -18,9 +20,18 @@ std::string ThreadHost::ThreadHostConfig::MakeThreadName(
       return prefix + ".platform";
     case Type::kUi:
       return prefix + ".ui";
+    case Type::kIo:
+      return prefix + ".io";
+    case Type::kRaster:
+      return prefix + ".raster";
     case Type::kProfiler:
       return prefix + ".profiler";
   }
+}
+
+void ThreadHost::ThreadHostConfig::SetIOConfig(const ThreadConfig& config) {
+  type_mask |= ThreadHost::Type::kIo;
+  io_config = config;
 }
 
 void ThreadHost::ThreadHostConfig::SetUIConfig(const ThreadConfig& config) {
@@ -32,6 +43,11 @@ void ThreadHost::ThreadHostConfig::SetPlatformConfig(
     const ThreadConfig& config) {
   type_mask |= ThreadHost::Type::kPlatform;
   platform_config = config;
+}
+
+void ThreadHost::ThreadHostConfig::SetRasterConfig(const ThreadConfig& config) {
+  type_mask |= ThreadHost::Type::kRaster;
+  raster_config = config;
 }
 
 void ThreadHost::ThreadHostConfig::SetProfilerConfig(
@@ -69,6 +85,15 @@ ThreadHost::ThreadHost(const ThreadHostConfig& host_config)
 
   if (host_config.isThreadNeeded(ThreadHost::Type::kUi)) {
     ui_thread = CreateThread(Type::kUi, host_config.ui_config, host_config);
+  }
+
+  if (host_config.isThreadNeeded(ThreadHost::Type::kRaster)) {
+    raster_thread =
+        CreateThread(Type::kRaster, host_config.raster_config, host_config);
+  }
+
+  if (host_config.isThreadNeeded(ThreadHost::Type::kIo)) {
+    io_thread = CreateThread(Type::kIo, host_config.io_config, host_config);
   }
 
   if (host_config.isThreadNeeded(ThreadHost::Type::kProfiler)) {

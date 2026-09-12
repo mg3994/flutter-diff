@@ -15,6 +15,7 @@ source_set("native_activity") {
 
   public_deps = [
     "//flutter/fml",
+    "//flutter/impeller/toolkit/android",
   ]
 
   libs = [

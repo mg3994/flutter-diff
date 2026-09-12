@@ -12,6 +12,9 @@
 #import "FlutterDartProject.h"
 #import "FlutterMacros.h"
 #import "FlutterPlugin.h"
+#import "FlutterTexture.h"
+
+@class FlutterViewController;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -282,12 +285,104 @@ FLUTTER_DARWIN_EXPORT
 - (void)destroyContext;
 
 /**
+ * Ensures that Flutter will generate a semantics tree.
+ *
+ * This is enabled by default if certain accessibility services are turned on by
+ * the user, or when using a Simulator. This method allows a user to turn
+ * semantics on when they would not ordinarily be generated and the performance
+ * overhead is not a concern, e.g. for UI testing. Note that semantics should
+ * never be programmatically turned off, as it would potentially disable
+ * accessibility services an end user has requested.
+ *
+ * This method must only be called after launching the engine via
+ * `-runWithEntrypoint:` or `-runWithEntryPoint:libraryURI`.
+ *
+ * Although this method returns synchronously, it does not guarantee that a
+ * semantics tree is actually available when the method returns. It
+ * synchronously ensures that the next frame the Flutter framework creates will
+ * have a semantics tree.
+ *
+ * You can subscribe to semantics updates via `NSNotificationCenter` by adding
+ * an observer for the name `FlutterSemanticsUpdateNotification`.  The `object`
+ * parameter will be the `FlutterViewController` associated with the semantics
+ * update.  This will asynchronously fire after a semantics tree has actually
+ * built (which may be some time after the frame has been rendered).
+ */
+- (void)ensureSemanticsEnabled;
+
+/**
+ * Sets the `FlutterViewController` for this instance.  The FlutterEngine must be
+ * running (e.g. a successful call to `-runWithEntrypoint:` or `-runWithEntrypoint:libraryURI`)
+ * before calling this method. Callers may pass nil to remove the viewController
+ * and have the engine run headless in the current process.
+ *
+ * A FlutterEngine can only have one `FlutterViewController` at a time. If there is
+ * already a `FlutterViewController` associated with this instance, this method will replace
+ * the engine's current viewController with the newly specified one.
+ *
+ * Setting the viewController will signal the engine to start animations and drawing, and unsetting
+ * it will signal the engine to stop animations and drawing.  However, neither will impact the state
+ * of the Dart program's execution.
+ */
+@property(nonatomic, weak) FlutterViewController* viewController;
+
+/**
  * The `FlutterMethodChannel` used for localization related platform messages, such as
  * setting the locale.
  *
  * Can be nil after `destroyContext` is called.
  */
 @property(nonatomic, readonly, nullable) FlutterMethodChannel* localizationChannel;
+/**
+ * The `FlutterMethodChannel` used for navigation related platform messages.
+ *
+ * Can be nil after `destroyContext` is called.
+ *
+ * @see [Navigation
+ * Channel](https://api.flutter.dev/flutter/services/SystemChannels/navigation-constant.html)
+ * @see [Navigator Widget](https://api.flutter.dev/flutter/widgets/Navigator-class.html)
+ */
+@property(nonatomic, readonly) FlutterMethodChannel* navigationChannel;
+
+/**
+ * The `FlutterMethodChannel` used for restoration related platform messages.
+ *
+ * Can be nil after `destroyContext` is called.
+ *
+ * @see [Restoration
+ * Channel](https://api.flutter.dev/flutter/services/SystemChannels/restoration-constant.html)
+ */
+@property(nonatomic, readonly) FlutterMethodChannel* restorationChannel;
+
+/**
+ * The `FlutterMethodChannel` used for core platform messages, such as
+ * information about the screen orientation.
+ *
+ * Can be nil after `destroyContext` is called.
+ */
+@property(nonatomic, readonly) FlutterMethodChannel* platformChannel;
+
+/**
+ * The `FlutterMethodChannel` used to communicate text input events to the
+ * Dart Isolate.
+ *
+ * Can be nil after `destroyContext` is called.
+ *
+ * @see [Text Input
+ * Channel](https://api.flutter.dev/flutter/services/SystemChannels/textInput-constant.html)
+ */
+@property(nonatomic, readonly) FlutterMethodChannel* textInputChannel;
+
+/**
+ * The `FlutterBasicMessageChannel` used to communicate app lifecycle events
+ * to the Dart Isolate.
+ *
+ * Can be nil after `destroyContext` is called.
+ *
+ * @see [Lifecycle
+ * Channel](https://api.flutter.dev/flutter/services/SystemChannels/lifecycle-constant.html)
+ */
+@property(nonatomic, readonly) FlutterBasicMessageChannel* lifecycleChannel;
 
 /**
  * The `FlutterBasicMessageChannel` used for communicating system events, such as
@@ -309,6 +404,14 @@ FLUTTER_DARWIN_EXPORT
 @property(nonatomic, readonly) FlutterBasicMessageChannel* settingsChannel;
 
 /**
+ * The `FlutterBasicMessageChannel` used for communicating key events
+ * from physical keyboards
+ *
+ * Can be nil after `destroyContext` is called.
+ */
+@property(nonatomic, readonly) FlutterBasicMessageChannel* keyEventChannel;
+
+/**
  * The `NSURL` of the Dart VM Service for the service isolate.
  *
  * This is only set in debug and profile runtime modes, and only after the
@@ -324,11 +427,23 @@ FLUTTER_DARWIN_EXPORT
 @property(nonatomic, readonly) NSObject<FlutterBinaryMessenger>* binaryMessenger;
 
 /**
+ * The `FlutterTextureRegistry` associated with this FlutterEngine (used to register textures).
+ */
+@property(nonatomic, readonly) NSObject<FlutterTextureRegistry>* textureRegistry;
+
+/**
  * The UI Isolate ID of the engine.
  *
  * This property will be nil if the engine is not running.
  */
 @property(nonatomic, readonly, copy, nullable) NSString* isolateId;
+
+/**
+ * Whether or not GPU calls are allowed.
+ *
+ * Typically this is set when the app is backgrounded and foregrounded.
+ */
+@property(nonatomic, assign) BOOL isGpuDisabled;
 
 @end
 

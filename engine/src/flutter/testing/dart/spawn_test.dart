@@ -41,8 +41,7 @@ const String kTestEntrypointRouteName = 'testEntrypoint';
 void testEntrypoint() {
   IsolateNameServer.lookupPortByName(
     kTestEntrypointRouteName,
-    // TODO(knopp): We don't currently expose initial route name
-  )!.send(kTestEntrypointRouteName);
+  )!.send(PlatformDispatcher.instance.defaultRouteName);
 }
 
 void main() {

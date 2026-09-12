@@ -15,5 +15,7 @@
 #import "FlutterMacros.h"
 #import "FlutterPluginMacOS.h"
 #import "FlutterPluginRegistrarMacOS.h"
+#import "FlutterTexture.h"
+#import "FlutterViewController.h"
 
 #endif  // FLUTTER_SHELL_PLATFORM_DARWIN_MACOS_FRAMEWORK_HEADERS_FLUTTERMACOS_H_

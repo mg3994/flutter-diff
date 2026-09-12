@@ -354,6 +354,10 @@ io.Directory getBundleBuildDirectory(TestBundle bundle) {
   return io.Directory(path.join(environment.webUiBuildDir.path, 'test_bundles', bundle.name));
 }
 
+io.Directory getSkiaGoldDirectoryForSuite(TestSuite suite) {
+  return io.Directory(path.join(environment.webUiSkiaGoldDirectory.path, suite.name));
+}
+
 extension AnsiColors on String {
   static bool shouldEscape = () {
     if (isLuci) {

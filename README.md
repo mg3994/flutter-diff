@@ -1,38 +1,127 @@
-# Flutter Zero
+<a href="https://flutter.dev/">
+  <h1 align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://docs.flutter.dev/logo_dark.png">
+      <img alt="Flutter" src="https://docs.flutter.dev/logo.png">
+    </picture>
+  </h1>
+</a>
 
-Flutter Zero is a stripped down version of [Flutter](https://flutter.dev) with most of the `dart:ui` removed. There is no built-in UI support, Skia or Impeller. It is built to be compatible with existing Flutter tooling, so the `flutter` tool can be used to create, build, and run Flutter Zero applications and the IDE plugins will keep working as expected too (minus the Flutter UI related parts obviously).
+[![Flutter CI Status](https://flutter-dashboard.appspot.com/api/public/build-status-badge?repo=flutter)](https://flutter-dashboard.appspot.com/#/build?repo=flutter)
+[![Discord badge][]][Discord instructions]
+[![Twitter handle][]][Twitter badge]
+[![BlueSky badge][]][BlueSky handle]
+[![LFX Health Score](https://insights.linuxfoundation.org/api/badge/health-score?project=flutter)](https://insights.linuxfoundation.org/project/flutter)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5631/badge)](https://bestpractices.coreinfrastructure.org/projects/5631)
+[![SLSA 1](https://slsa.dev/images/gh-badge-level1.svg)](https://slsa.dev)
 
-In other words Flutter Zero is a minimal Dart runtime that can be used to build applications on all platforms supported by Flutter, but without making any assumptions about the UI layer.
+Flutter is Google's SDK for crafting beautiful, fast user experiences for
+mobile, web, and desktop from a single codebase. Flutter works with existing
+code, is used by developers and organizations around the world, and is free and
+open source.
 
-This is done in an effort to explore new use-cases for Dart, such as writing applications with native UI toolkits through [Dart interop](https://dart.dev/interop) or building `dart:ui` as a separate package not built into the Flutter engine.
+## Documentation
 
+* [Install Flutter](https://docs.flutter.dev/get-started)
+* [Flutter documentation](https://docs.flutter.dev)
+* [Development wiki](./docs/README.md)
+* [Contributing to Flutter](https://github.com/flutter/flutter/blob/main/CONTRIBUTING.md)
 
-# Hypothetically Asked Questions
+For release and other announcements, join the
+[flutter-announce](https://groups.google.com/g/flutter-announce)
+mailing list. Our documentation also tracks [breaking
+changes](https://docs.flutter.dev/release/breaking-changes) across releases.
 
-### Can this be used right now?
+## Terms of service
 
-Yes! It is very raw but there are engine builds available for all supported platforms.
+The Flutter tool may occasionally download resources from Google servers. By
+downloading or using the Flutter SDK, you agree to the Google Terms of Service:
+https://policies.google.com/terms
 
-### Why?
+For example, when installed from GitHub (as opposed to from a prepackaged
+archive), the Flutter tool will download the Dart SDK from Google servers
+immediately when first run, as it is used to execute the `flutter` tool itself.
+This will also occur when Flutter is upgraded (e.g. by running the `flutter
+upgrade` command).
 
-Why not?
+## About Flutter
 
-### No seriously, why though?
+We think Flutter will help you create beautiful, fast apps, with a productive,
+extensible and open development model, whether you're targeting iOS or Android,
+web, Windows, macOS, Linux or embedding it as the UI toolkit for a platform of
+your choice.
 
-Because I'm not too happy how tightly `dart:ui` is coupled with Flutter, and to be fair, I'm not too happy with how `dart:ui` is built either. I'm fairly certain that every decision made when building `dart:ui` made perfect sense at the time, but the cumulative effect is that `dart:ui` is a monolithic blob with layers of abstractions and indirections that are not always at the right place or even necessary.
+### Beautiful user experiences
 
-It was built with assumptions and constraints that are not valid anymore. The threading model has changed. The FFI story has improved significantly. Bidirectional synchronous interaction between Dart and platform APIs is now possible. The untyped, underspecified, asynchronous and often adhoc platform channels are not needed anymore.  Dart has now support for [native assets](https://github.com/dart-lang/native) meaning that packages can easily contribute native code with custom built-steps.
+We want to enable designers to deliver their full creative vision without being
+forced to water it down due to limitations of the underlying framework.
+Flutter's [layered architecture] gives you control over every pixel on the
+screen and its powerful compositing capabilities let you overlay and animate
+graphics, video, text, and controls without limitation. Flutter includes a full
+[set of widgets][widget catalog] that deliver pixel-perfect experiences whether
+you're building for iOS ([Cupertino]) or other platforms ([Material]), along with
+support for customizing or creating entirely new visual components.
 
-All of this combined means that it now *might* be feasible to build a modular version of `dart:ui`, decoupled from the engine, with proper Dart interfaces and platform specific FFI/JNI implementations.
+<p align="center"><img src="https://github.com/flutter/website/blob/main/sites/docs/web/assets/images/docs/homepage/reflectly-hero-600px.png?raw=true" alt="Reflectly hero image"></p>
 
-### Why is this a new repository and not a technically a fork?
+### Fast results
 
-This contains a very tiny subset of the Flutter codebase. The original Flutter repository is huge and vast majority of the history is completely irrelevant. This prioritizes fast checkout and smaller disk usage.
+Flutter is fast. It's powered by hardware-accelerated 2D graphics
+libraries like [Skia] (which underpins Chrome and Android) and
+[Impeller]. We architected Flutter to
+support glitch-free, jank-free graphics at the native speed of your device.
 
-### What is the threading model?
+Flutter code is powered by the world-class [Dart programming language], which enables
+compilation to 32-bit and 64-bit ARM machine code for iOS and Android,
+JavaScript and WebAssembly for the web, as well as Intel x64 and ARM
+for desktop devices.
 
-All Dart code runs on the platform thread. No other threading configurations are supported.
+<p align="center"><img src="https://github.com/flutter/website/blob/main/sites/docs/web/assets/images/docs/homepage/dart-diagram-small.png?raw=true" alt="Dart diagram"></p>
 
-### Why does this still have Flutter in the name given that most of what makes Flutter, Flutter is gone?
+### Productive development
 
-TBH, this is a very experimental project and I don't feel like obsessing over the name is a high priority right now. The compatibility with tooling is a key feature (I don't need to spend a year trying to rewrite the `flutter_tool` from scratch), and eventually, with a lot of luck and motivation, it should be possible to write a `dart:ui` reimplementation and an abstraction layer good enough so that regular Flutter applications could run on top of Flutter Zero with minimal changes.
+Flutter offers [stateful hot reload][Hot reload], allowing you to make changes to your code
+and see the results instantly without restarting your app or losing its state.
+
+[![Hot reload animation][]][Hot reload]
+
+### Extensible and open model
+
+Flutter works with any development tool (or none at all), and also includes
+editor plug-ins for both [Visual Studio Code] and [IntelliJ / Android Studio].
+Flutter provides [tens of thousands of packages][Flutter packages] to speed your
+development, regardless of your target platform. And accessing other native code
+is easy, with support for both FFI ([on Android][Android FFI], [on iOS][iOS FFI],
+[on macOS][macOS FFI], and [on Windows][Windows FFI]) as well as
+[platform-specific APIs][platform channels].
+
+Flutter is a fully open-source project, and we welcome contributions.
+Information on how to get started can be found in our
+[contributor guide](CONTRIBUTING.md).
+
+[flutter.dev]: https://flutter.dev
+[Discord instructions]: ./docs/contributing/Chat.md
+[Discord badge]: https://img.shields.io/discord/608014603317936148?logo=discord
+[Twitter handle]: https://img.shields.io/twitter/follow/flutterdev.svg?style=social&label=Follow
+[Twitter badge]: https://twitter.com/intent/follow?screen_name=flutterdev
+[BlueSky badge]: https://img.shields.io/badge/Bluesky-0285FF?logo=bluesky&logoColor=fff&label=Follow%20me%20on&color=0285FF
+[BlueSky handle]: https://bsky.app/profile/flutter.dev
+[layered architecture]: https://docs.flutter.dev/resources/inside-flutter
+[architectural overview]: https://docs.flutter.dev/resources/architectural-overview
+[widget catalog]: https://docs.flutter.dev/ui/widgets
+[Cupertino]: https://docs.flutter.dev/ui/widgets/cupertino
+[Material]: https://docs.flutter.dev/ui/widgets/material
+[Skia]: https://skia.org/
+[Dart programming language]: https://dart.dev/
+[Hot reload animation]: https://github.com/flutter/website/blob/main/sites/docs/web/assets/images/docs/tools/android-studio/hot-reload.gif?raw=true
+[Hot reload]: https://docs.flutter.dev/tools/hot-reload
+[Visual Studio Code]: https://marketplace.visualstudio.com/items?itemName=Dart-Code.flutter
+[IntelliJ / Android Studio]: https://plugins.jetbrains.com/plugin/9212-flutter
+[Flutter packages]: https://pub.dev/flutter
+[Android FFI]: https://docs.flutter.dev/platform-integration/android/c-interop
+[iOS FFI]: https://docs.flutter.dev/platform-integration/ios/c-interop
+[macOS FFI]: https://docs.flutter.dev/platform-integration/macos/c-interop
+[Windows FFI]: https://docs.flutter.dev/platform-integration/windows/building#integrating-with-windows
+[platform channels]: https://docs.flutter.dev/platform-integration/platform-channels
+[interop example]: https://github.com/flutter/flutter/tree/main/examples/platform_channel
+[Impeller]: https://docs.flutter.dev/perf/impeller

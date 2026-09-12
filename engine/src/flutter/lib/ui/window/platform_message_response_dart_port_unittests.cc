@@ -19,7 +19,9 @@ TEST_F(ShellTest, PlatformMessageResponseDartPort) {
   auto message_latch = std::make_shared<fml::AutoResetWaitableEvent>();
   TaskRunners task_runners("test",                  // label
                            GetCurrentTaskRunner(),  // platform
-                           CreateNewThread()        // ui
+                           CreateNewThread(),       // raster
+                           CreateNewThread(),       // ui
+                           CreateNewThread()        // io
   );
 
   auto nativeCallPlatformMessageResponseDartPort =

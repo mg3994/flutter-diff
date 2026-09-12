@@ -51,6 +51,24 @@ class FlutterEngine : public PluginRegistry {
   // Terminates the running engine.
   void ShutDown();
 
+  // Processes any pending events in the Flutter engine, and returns the
+  // nanosecond delay until the next scheduled event (or  max, if none).
+  //
+  // This should be called on every run of the application-level runloop, and
+  // a wait for native events in the runloop should never be longer than the
+  // last return value from this function.
+  std::chrono::nanoseconds ProcessMessages();
+
+  // Tells the engine that the system font list has changed. Should be called
+  // by clients when OS-level font changes happen (e.g., WM_FONTCHANGE in a
+  // Win32 application).
+  void ReloadSystemFonts();
+
+  // Tells the engine that the platform brightness value has changed. Should be
+  // called by clients when OS-level theme changes happen (e.g.,
+  // WM_DWMCOLORIZATIONCOLORCHANGED in a Win32 application).
+  void ReloadPlatformBrightness();
+
   // flutter::PluginRegistry:
   FlutterDesktopPluginRegistrarRef GetRegistrarForPlugin(
       const std::string& plugin_name) override;
@@ -61,7 +79,42 @@ class FlutterEngine : public PluginRegistry {
   // This pointer will remain valid for the lifetime of this instance.
   BinaryMessenger* messenger() { return messenger_.get(); }
 
+  // Schedule a callback to be called after the next frame is drawn.
+  //
+  // This must be called from the platform thread. The callback is executed only
+  // once on the platform thread.
+  void SetNextFrameCallback(std::function<void()> callback);
+
+  // Returns true if the current thread is the platform thread.
+  bool IsPlatformThread() const;
+
+  // Schedule a callback to be called on the platform thread.
+  //
+  // This can be called on any thread. The callback is executed only
+  // once on the platform thread.
+  void PostPlatformThreadTask(std::function<void()> callback);
+
+  // Called to pass an external window message to the engine for lifecycle
+  // state updates. Non-Flutter windows must call this method in their WndProc
+  // in order to be included in the logic for application lifecycle state
+  // updates. Returns a result if the message should be consumed.
+  std::optional<LRESULT> ProcessExternalWindowMessage(HWND hwnd,
+                                                      UINT message,
+                                                      WPARAM wparam,
+                                                      LPARAM lparam);
+
+  // Retrieves the DXGI adapter used for rendering. Returns true if the adapter
+  // was successfully retrieved, or false if an error occured.
+  // The caller must provide a valid pointer to an IDXGIAdapter* and is
+  // responsible for releasing the adapter.
+  bool GetGraphicsAdapter(IDXGIAdapter** adapter_out) {
+    return FlutterDesktopEngineGetGraphicsAdapter(engine_, adapter_out);
+  }
+
  private:
+  // For access to the engine handle.
+  friend class FlutterViewController;
+
   // Gives up ownership of |engine_|, but keeps a weak reference to it.
   //
   // This is intended to be used by FlutterViewController, since the underlying

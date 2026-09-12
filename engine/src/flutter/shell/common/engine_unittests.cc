@@ -9,12 +9,15 @@
 #include "flutter/runtime/dart_vm_lifecycle.h"
 #include "flutter/shell/common/thread_host.h"
 #include "flutter/testing/fixture_test.h"
+#include "flutter/testing/testing.h"
 #include "fml/mapping.h"
-#include "fml/synchronization/waitable_event.h"
 #include "gmock/gmock.h"
+#include "lib/ui/text/font_collection.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+#include "runtime/isolate_configuration.h"
+#include "shell/common/run_configuration.h"
 
 namespace flutter {
 
@@ -58,6 +61,15 @@ class FontManifestAssetResolver : public AssetResolver {
 class MockDelegate : public Engine::Delegate {
  public:
   MOCK_METHOD(void,
+              OnEngineUpdateSemantics,
+              (int64_t, SemanticsNodeUpdates, CustomAccessibilityActionUpdates),
+              (override));
+  MOCK_METHOD(void,
+              OnEngineSetApplicationLocale,
+              (const std::string),
+              (override));
+  MOCK_METHOD(void, OnEngineSetSemanticsTreeEnabled, (bool), (override));
+  MOCK_METHOD(void,
               OnEngineHandlePlatformMessage,
               (std::unique_ptr<PlatformMessage>),
               (override));
@@ -67,6 +79,7 @@ class MockDelegate : public Engine::Delegate {
               UpdateIsolateDescription,
               (const std::string, int64_t),
               (override));
+  MOCK_METHOD(void, SetNeedsReportTimings, (bool), (override));
   MOCK_METHOD(std::unique_ptr<std::vector<std::string>>,
               ComputePlatformResolvedLocale,
               (const std::vector<std::string>&),
@@ -78,6 +91,14 @@ class MockDelegate : public Engine::Delegate {
               (),
               (const, override));
   MOCK_METHOD(void, OnEngineChannelUpdate, (std::string, bool), (override));
+  MOCK_METHOD(double,
+              GetScaledFontSize,
+              (double font_size, int configuration_id),
+              (const, override));
+  MOCK_METHOD(void,
+              RequestViewFocusChange,
+              (const ViewFocusChangeRequest&),
+              (override));
 };
 
 class MockResponse : public PlatformMessageResponse {
@@ -88,16 +109,31 @@ class MockResponse : public PlatformMessageResponse {
 
 class MockRuntimeDelegate : public RuntimeDelegate {
  public:
+  MOCK_METHOD(std::string, DefaultRouteName, (), (override));
+  MOCK_METHOD(void, ScheduleFrame, (bool), (override));
+  MOCK_METHOD(void, OnAllViewsRendered, (), (override));
+  MOCK_METHOD(void,
+              Render,
+              (int64_t, std::unique_ptr<flutter::LayerTree>, float),
+              (override));
+  MOCK_METHOD(void,
+              UpdateSemantics,
+              (int64_t, SemanticsNodeUpdates, CustomAccessibilityActionUpdates),
+              (override));
+  MOCK_METHOD(void, SetApplicationLocale, (const std::string), (override));
+  MOCK_METHOD(void, SetSemanticsTreeEnabled, (bool), (override));
   MOCK_METHOD(void,
               HandlePlatformMessage,
               (std::unique_ptr<PlatformMessage>),
               (override));
+  MOCK_METHOD(FontCollection&, GetFontCollection, (), (override));
   MOCK_METHOD(std::shared_ptr<AssetManager>, GetAssetManager, (), (override));
   MOCK_METHOD(void, OnRootIsolateCreated, (), (override));
   MOCK_METHOD(void,
               UpdateIsolateDescription,
               (const std::string, int64_t),
               (override));
+  MOCK_METHOD(void, SetNeedsReportTimings, (bool), (override));
   MOCK_METHOD(std::unique_ptr<std::vector<std::string>>,
               ComputePlatformResolvedLocale,
               (const std::vector<std::string>&),
@@ -108,6 +144,14 @@ class MockRuntimeDelegate : public RuntimeDelegate {
               (),
               (const, override));
   MOCK_METHOD(void, SendChannelUpdate, (std::string, bool), (override));
+  MOCK_METHOD(double,
+              GetScaledFontSize,
+              (double font_size, int configuration_id),
+              (const, override));
+  MOCK_METHOD(void,
+              RequestViewFocusChange,
+              (const ViewFocusChangeRequest&),
+              (override));
 };
 
 class MockRuntimeController : public RuntimeController {
@@ -128,7 +172,14 @@ class MockRuntimeController : public RuntimeController {
   MOCK_METHOD(bool, NotifyIdle, (fml::TimeDelta), (override));
 };
 
-#if 0
+class MockFontCollection : public FontCollection {
+ public:
+  MOCK_METHOD(void,
+              RegisterFonts,
+              (const std::shared_ptr<AssetManager>& asset_manager),
+              (override));
+};
+
 std::unique_ptr<PlatformMessage> MakePlatformMessage(
     const std::string& channel,
     const std::map<std::string, std::string>& values,
@@ -154,17 +205,19 @@ std::unique_ptr<PlatformMessage> MakePlatformMessage(
       channel, fml::MallocMapping::Copy(data, buffer.GetSize()), response);
   return message;
 }
-#endif
 
 class EngineTest : public testing::FixtureTest {
  public:
   EngineTest()
       : thread_host_("EngineTest",
-                     ThreadHost::Type::kPlatform | ThreadHost::Type::kUi),
+                     ThreadHost::Type::kPlatform | ThreadHost::Type::kIo |
+                         ThreadHost::Type::kUi | ThreadHost::Type::kRaster),
         task_runners_({
             "EngineTest",
             thread_host_.platform_thread->GetTaskRunner(),  // platform
+            thread_host_.raster_thread->GetTaskRunner(),    // raster
             thread_host_.ui_thread->GetTaskRunner(),        // ui
+            thread_host_.io_thread->GetTaskRunner()         // io
         }) {}
 
   void PostUITaskSync(const std::function<void()>& function) {
@@ -177,13 +230,23 @@ class EngineTest : public testing::FixtureTest {
   }
 
  protected:
-  void SetUp() override { settings_ = CreateSettingsForFixture(); }
+  void SetUp() override {
+    settings_ = CreateSettingsForFixture();
+    dispatcher_maker_ = [](PointerDataDispatcher::Delegate&) {
+      return nullptr;
+    };
+  }
 
   MockDelegate delegate_;
+  PointerDataDispatcherMaker dispatcher_maker_;
   ThreadHost thread_host_;
   TaskRunners task_runners_;
   Settings settings_;
+  std::unique_ptr<Animator> animator_;
+  fml::WeakPtr<IOManager> io_manager_;
   std::unique_ptr<RuntimeController> runtime_controller_;
+  std::shared_ptr<fml::ConcurrentTaskRunner> image_decoder_task_runner_;
+  fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate_;
 };
 }  // namespace
 
@@ -191,9 +254,15 @@ TEST_F(EngineTest, Create) {
   PostUITaskSync([this] {
     auto engine = std::make_unique<Engine>(
         /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
         /*task_runners=*/task_runners_,
         /*settings=*/settings_,
-        /*runtime_controller=*/std::move(runtime_controller_));
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(runtime_controller_),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
     EXPECT_TRUE(engine);
   });
 }
@@ -207,15 +276,143 @@ TEST_F(EngineTest, DispatchPlatformMessageUnknown) {
         .WillRepeatedly(::testing::Return(false));
     auto engine = std::make_unique<Engine>(
         /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
         /*task_runners=*/task_runners_,
         /*settings=*/settings_,
-        /*runtime_controller=*/std::move(mock_runtime_controller));
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
 
     fml::RefPtr<PlatformMessageResponse> response =
         fml::MakeRefCounted<MockResponse>();
     std::unique_ptr<PlatformMessage> message =
         std::make_unique<PlatformMessage>("foo", response);
     engine->DispatchPlatformMessage(std::move(message));
+  });
+}
+
+TEST_F(EngineTest, DispatchPlatformMessageInitialRoute) {
+  PostUITaskSync([this] {
+    MockRuntimeDelegate client;
+    auto mock_runtime_controller =
+        std::make_unique<MockRuntimeController>(client, task_runners_);
+    EXPECT_CALL(*mock_runtime_controller, IsRootIsolateRunning())
+        .WillRepeatedly(::testing::Return(false));
+    auto engine = std::make_unique<Engine>(
+        /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
+        /*task_runners=*/task_runners_,
+        /*settings=*/settings_,
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
+
+    fml::RefPtr<PlatformMessageResponse> response =
+        fml::MakeRefCounted<MockResponse>();
+    std::map<std::string, std::string> values{
+        {"method", "setInitialRoute"},
+        {"args", "test_initial_route"},
+    };
+    std::unique_ptr<PlatformMessage> message =
+        MakePlatformMessage("flutter/navigation", values, response);
+    engine->DispatchPlatformMessage(std::move(message));
+    EXPECT_EQ(engine->InitialRoute(), "test_initial_route");
+  });
+}
+
+TEST_F(EngineTest, DispatchPlatformMessageInitialRouteIgnored) {
+  PostUITaskSync([this] {
+    MockRuntimeDelegate client;
+    auto mock_runtime_controller =
+        std::make_unique<MockRuntimeController>(client, task_runners_);
+    EXPECT_CALL(*mock_runtime_controller, IsRootIsolateRunning())
+        .WillRepeatedly(::testing::Return(true));
+    EXPECT_CALL(*mock_runtime_controller, DispatchPlatformMessage(::testing::_))
+        .WillRepeatedly(::testing::Return(true));
+    auto engine = std::make_unique<Engine>(
+        /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
+        /*task_runners=*/task_runners_,
+        /*settings=*/settings_,
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
+
+    fml::RefPtr<PlatformMessageResponse> response =
+        fml::MakeRefCounted<MockResponse>();
+    std::map<std::string, std::string> values{
+        {"method", "setInitialRoute"},
+        {"args", "test_initial_route"},
+    };
+    std::unique_ptr<PlatformMessage> message =
+        MakePlatformMessage("flutter/navigation", values, response);
+    engine->DispatchPlatformMessage(std::move(message));
+    EXPECT_EQ(engine->InitialRoute(), "");
+  });
+}
+
+TEST_F(EngineTest, SpawnSharesFontLibrary) {
+  PostUITaskSync([this] {
+    MockRuntimeDelegate client;
+    auto mock_runtime_controller =
+        std::make_unique<MockRuntimeController>(client, task_runners_);
+    auto vm_ref = DartVMRef::Create(settings_);
+    EXPECT_CALL(*mock_runtime_controller, GetDartVM())
+        .WillRepeatedly(::testing::Return(vm_ref.get()));
+    auto engine = std::make_unique<Engine>(
+        /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
+        /*task_runners=*/task_runners_,
+        /*settings=*/settings_,
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
+
+    auto spawn =
+        engine->Spawn(delegate_, dispatcher_maker_, settings_, nullptr,
+                      std::string(), io_manager_, snapshot_delegate_, nullptr);
+    EXPECT_TRUE(spawn != nullptr);
+    EXPECT_EQ(&engine->GetFontCollection(), &spawn->GetFontCollection());
+  });
+}
+
+TEST_F(EngineTest, SpawnWithCustomInitialRoute) {
+  PostUITaskSync([this] {
+    MockRuntimeDelegate client;
+    auto mock_runtime_controller =
+        std::make_unique<MockRuntimeController>(client, task_runners_);
+    auto vm_ref = DartVMRef::Create(settings_);
+    EXPECT_CALL(*mock_runtime_controller, GetDartVM())
+        .WillRepeatedly(::testing::Return(vm_ref.get()));
+    auto engine = std::make_unique<Engine>(
+        /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
+        /*task_runners=*/task_runners_,
+        /*settings=*/settings_,
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
+
+    auto spawn =
+        engine->Spawn(delegate_, dispatcher_maker_, settings_, nullptr, "/foo",
+                      io_manager_, snapshot_delegate_, nullptr);
+    EXPECT_TRUE(spawn != nullptr);
+    ASSERT_EQ("/foo", spawn->InitialRoute());
   });
 }
 
@@ -229,14 +426,22 @@ TEST_F(EngineTest, SpawnWithCustomSettings) {
         .WillRepeatedly(::testing::Return(vm_ref.get()));
     auto engine = std::make_unique<Engine>(
         /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
         /*task_runners=*/task_runners_,
         /*settings=*/settings_,
-        /*runtime_controller=*/std::move(mock_runtime_controller));
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
 
     Settings custom_settings = settings_;
     custom_settings.persistent_isolate_data =
         std::make_shared<fml::DataMapping>("foo");
-    auto spawn = engine->Spawn(delegate_, custom_settings);
+    auto spawn =
+        engine->Spawn(delegate_, dispatcher_maker_, custom_settings, nullptr,
+                      std::string(), io_manager_, snapshot_delegate_, nullptr);
     EXPECT_TRUE(spawn != nullptr);
     auto new_persistent_isolate_data =
         const_cast<RuntimeController*>(spawn->GetRuntimeController())
@@ -262,9 +467,15 @@ TEST_F(EngineTest, PassesLoadDartDeferredLibraryErrorToRuntime) {
         .Times(1);
     auto engine = std::make_unique<Engine>(
         /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
         /*task_runners=*/task_runners_,
         /*settings=*/settings_,
-        /*runtime_controller=*/std::move(mock_runtime_controller));
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
 
     engine->LoadDartDeferredLibraryError(error_id, error_message, true);
   });
@@ -284,9 +495,15 @@ TEST_F(EngineTest, SpawnedEngineInheritsAssetManager) {
     //     .WillOnce(::testing::Return());
     auto engine = std::make_unique<Engine>(
         /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
         /*task_runners=*/task_runners_,
         /*settings=*/settings_,
-        /*runtime_controller=*/std::move(mock_runtime_controller));
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/std::make_shared<FontCollection>(),
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
 
     EXPECT_EQ(engine->GetAssetManager(), nullptr);
 
@@ -295,7 +512,9 @@ TEST_F(EngineTest, SpawnedEngineInheritsAssetManager) {
     engine->UpdateAssetManager(asset_manager);
     EXPECT_EQ(engine->GetAssetManager(), asset_manager);
 
-    auto spawn = engine->Spawn(delegate_, settings_);
+    auto spawn =
+        engine->Spawn(delegate_, dispatcher_maker_, settings_, nullptr,
+                      std::string(), io_manager_, snapshot_delegate_, nullptr);
     EXPECT_TRUE(spawn != nullptr);
     EXPECT_EQ(engine->GetAssetManager(), spawn->GetAssetManager());
   });
@@ -310,11 +529,20 @@ TEST_F(EngineTest, UpdateAssetManagerWithEqualManagers) {
     EXPECT_CALL(*mock_runtime_controller, GetDartVM())
         .WillRepeatedly(::testing::Return(vm_ref.get()));
 
+    auto mock_font_collection = std::make_shared<MockFontCollection>();
+    EXPECT_CALL(*mock_font_collection, RegisterFonts(::testing::_))
+        .WillOnce(::testing::Return());
     auto engine = std::make_unique<Engine>(
         /*delegate=*/delegate_,
+        /*dispatcher_maker=*/dispatcher_maker_,
+        /*image_decoder_task_runner=*/image_decoder_task_runner_,
         /*task_runners=*/task_runners_,
         /*settings=*/settings_,
-        /*runtime_controller=*/std::move(mock_runtime_controller));
+        /*animator=*/std::move(animator_),
+        /*io_manager=*/io_manager_,
+        /*font_collection=*/mock_font_collection,
+        /*runtime_controller=*/std::move(mock_runtime_controller),
+        /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
 
     EXPECT_EQ(engine->GetAssetManager(), nullptr);
 

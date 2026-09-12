@@ -88,6 +88,8 @@ using MappingCallback = std::function<std::unique_ptr<fml::Mapping>(void)>;
 using Mappings = std::vector<std::unique_ptr<const fml::Mapping>>;
 using MappingsCallback = std::function<Mappings(void)>;
 
+using FrameRasterizedCallback = std::function<void(const FrameTiming&)>;
+
 class DartIsolate;
 
 // TODO(https://github.com/flutter/flutter/issues/138750): Re-order fields to
@@ -144,7 +146,9 @@ struct Settings {
   // Isolate settings
   bool enable_checked_mode = false;
   bool start_paused = false;
+  bool trace_skia = false;
   std::vector<std::string> trace_allowlist;
+  std::optional<std::vector<std::string>> trace_skia_allowlist;
   bool trace_startup = false;
   bool trace_systrace = false;
   std::string trace_to_file;
@@ -156,7 +160,6 @@ struct Settings {
   bool enable_dart_profiling = false;
   bool profile_startup = false;
   bool disable_dart_asserts = false;
-  bool enable_serial_gc = false;
   bool profile_microtasks = false;
 
   // Whether embedder only allows secure connections.
@@ -197,9 +200,68 @@ struct Settings {
   // the VM service.
   bool disable_service_auth_codes = true;
 
+  // Determines whether WebSocket origin checks are disabled for the VM service.
+  bool disable_service_origin_check = false;
+
   // Determine whether the vmservice should fallback to automatic port selection
   // after failing to bind to a specified port.
   bool enable_service_port_fallback = false;
+
+  // Font settings
+  bool use_test_fonts = false;
+
+  bool use_asset_fonts = true;
+
+  // Indicates whether the embedding started a prefetch of the default font
+  // manager before creating the engine.
+  bool prefetched_default_font_manager = false;
+
+  // Enable the rendering of colors outside of the sRGB gamut.
+  bool enable_wide_gamut = false;
+
+  // Enable the Impeller renderer on supported platforms. Ignored if Impeller is
+  // not supported on the platform.
+#if FML_OS_ANDROID || FML_OS_IOS || FML_OS_IOS_SIMULATOR
+  // On iOS devices, Impeller is the default with no opt-out and this field is
+  // const.
+#if FML_OS_IOS || FML_OS_IOS_SIMULATOR || SLIMPELLER
+  static constexpr const
+#endif                              // FML_OS_IOS && !FML_OS_IOS_SIMULATOR
+      bool enable_impeller = true;  // NOLINT(readability-identifier-naming)
+#else
+  bool enable_impeller = false;
+#endif
+
+  bool enable_flutter_gpu = false;
+
+  // Enable android surface control swapchains where supported.
+  bool enable_surface_control = false;
+
+  // Whether to lazily initialize impeller PSO state.
+  bool impeller_enable_lazy_shader_mode = false;
+
+  // Whether to use SDFs for rendering in Impeller.
+  bool impeller_use_sdfs = false;
+
+  // Log a warning during shell initialization if Impeller is not enabled.
+  bool warn_on_impeller_opt_out = false;
+
+  // Requests a specific rendering backend.
+  std::optional<std::string> requested_rendering_backend;
+
+  // Enable Vulkan validation on backends that support it. The validation layers
+  // must be available to the application.
+  bool enable_vulkan_validation = false;
+
+  // Enable GPU tracing in GLES backends.
+  // Some devices claim to support the required APIs but crash on their usage.
+  bool enable_opengl_gpu_tracing = false;
+
+  // Enable GPU tracing in Vulkan backends.
+  bool enable_vulkan_gpu_tracing = false;
+
+  // Data set by platform-specific embedders for use in font initialization.
+  uint32_t font_initialization_data = 0;
 
   // All shells in the process share the same VM. The last shell to shutdown
   // should typically shut down the VM as well. However, applications depend on
@@ -254,7 +316,8 @@ struct Settings {
   // thread and embedders must re-thread if necessary. Performing blocking
   // calls in this callback will cause applications to jank.
   LogMessageCallback log_message_callback;
-
+  bool enable_software_rendering = false;
+  bool skia_deterministic_rendering_on_cpu = false;
   bool verbose_logging = false;
   std::string log_tag = "flutter";
 
@@ -270,6 +333,10 @@ struct Settings {
   fml::UniqueFD::element_type assets_dir =
       fml::UniqueFD::traits_type::InvalidValue();
   std::string assets_path;
+
+  // Callback to handle the timings of a rasterized frame. This is called as
+  // soon as a frame is rasterized.
+  FrameRasterizedCallback frame_rasterized_callback;
 
   // This data will be available to the isolate immediately on launch via the
   // PlatformDispatcher.getPersistentIsolateData callback. This is meant for
@@ -289,6 +356,15 @@ struct Settings {
   // Max bytes threshold of resource cache, or 0 for unlimited.
   size_t resource_cache_max_bytes_threshold = 0;
 
+  /// Enable embedder api on the embedder.
+  ///
+  /// This is currently only used by iOS.
+  bool enable_embedder_api = false;
+
+  /// Enable support for isolates that run on the platform thread.
+  ///
+  /// This is used by the runOnPlatformThread API.
+  bool enable_platform_isolates = false;
 
   enum class MergedPlatformUIThread {
     // Use separate threads for the UI and platform task runners.

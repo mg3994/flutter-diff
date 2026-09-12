@@ -239,6 +239,56 @@ FLUTTER_ASSERT_ARC
   [mockMainBundle stopMocking];
 }
 
+- (void)testEnableFlutterGPUCommandLineArgument {
+  id mockMainBundle = OCMPartialMock([NSBundle mainBundle]);
+  OCMStub([mockMainBundle objectForInfoDictionaryKey:@"FLTEnableFlutterGPU"]).andReturn(@"YES");
+  id mockProcessInfo = OCMPartialMock([NSProcessInfo processInfo]);
+  NSArray* arguments = @[ @"process_name" ];
+  OCMStub([mockProcessInfo arguments]).andReturn(arguments);
+
+  auto settings = FLTDefaultSettingsForBundle(nil, mockProcessInfo);
+
+  XCTAssertTrue(settings.enable_flutter_gpu);
+  [mockMainBundle stopMocking];
+}
+
+- (void)testWideGamutSettingUsesBundleValue {
+  id mockBundle = OCMClassMock([NSBundle class]);
+  id mockMainBundle = OCMClassMock([NSBundle class]);
+  OCMStub([mockBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"]).andReturn(@YES);
+  OCMStub([mockMainBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"]).andReturn(@NO);
+
+  NSNumber* enableWideGamut = FLTEnableWideGamutFromBundle(mockBundle, mockMainBundle);
+
+  XCTAssertEqualObjects(enableWideGamut, @YES);
+  [mockMainBundle stopMocking];
+  [mockBundle stopMocking];
+}
+
+- (void)testWideGamutSettingFallsBackToMainBundleValue {
+  id mockBundle = OCMClassMock([NSBundle class]);
+  id mockMainBundle = OCMClassMock([NSBundle class]);
+  OCMStub([mockBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"]).andReturn(nil);
+  OCMStub([mockMainBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"]).andReturn(@NO);
+
+  NSNumber* enableWideGamut = FLTEnableWideGamutFromBundle(mockBundle, mockMainBundle);
+
+  XCTAssertEqualObjects(enableWideGamut, @NO);
+  [mockMainBundle stopMocking];
+  [mockBundle stopMocking];
+}
+
+- (void)testWideGamutSettingDoesNotRepeatMainBundleLookup {
+  id mockMainBundle = OCMClassMock([NSBundle class]);
+  OCMStub([mockMainBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"]).andReturn(nil);
+
+  NSNumber* enableWideGamut = FLTEnableWideGamutFromBundle(mockMainBundle, mockMainBundle);
+
+  XCTAssertNil(enableWideGamut);
+  OCMVerify(times(1), [mockMainBundle objectForInfoDictionaryKey:@"FLTEnableWideGamut"]);
+  [mockMainBundle stopMocking];
+}
+
 - (void)testEnableTraceSystraceSettingIsCorrectlyParsed {
   NSBundle* mainBundle = [NSBundle mainBundle];
   NSNumber* enableTraceSystrace = [mainBundle objectForInfoDictionaryKey:@"FLTTraceSystrace"];

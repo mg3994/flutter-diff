@@ -11,6 +11,7 @@ import androidx.annotation.VisibleForTesting;
 import io.flutter.FlutterInjector;
 import io.flutter.embedding.engine.dart.DartExecutor.DartEntrypoint;
 import io.flutter.embedding.engine.loader.FlutterLoader;
+import io.flutter.plugin.platform.PlatformViewsController;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -95,10 +96,30 @@ public class FlutterEngineGroup {
    * engine created will recreate its dependencies.
    */
   public FlutterEngine createAndRunEngine(
+      @NonNull Context context, @Nullable DartEntrypoint dartEntrypoint) {
+    return createAndRunEngine(context, dartEntrypoint, null);
+  }
+
+  /**
+   * Creates a {@link io.flutter.embedding.engine.FlutterEngine} in this group and run its {@link
+   * io.flutter.embedding.engine.dart.DartExecutor} with the specified {@link DartEntrypoint} and
+   * the specified {@code initialRoute}.
+   *
+   * <p>If no prior {@link io.flutter.embedding.engine.FlutterEngine} were created in this group,
+   * the initialization cost will be slightly higher than subsequent engines. The very first {@link
+   * io.flutter.embedding.engine.FlutterEngine} created per program, regardless of
+   * FlutterEngineGroup, also incurs the Dart VM creation time.
+   *
+   * <p>Subsequent engine creations will share resources with existing engines. However, if all
+   * existing engines were {@link io.flutter.embedding.engine.FlutterEngine#destroy()}ed, the next
+   * engine created will recreate its dependencies.
+   */
+  public FlutterEngine createAndRunEngine(
       @NonNull Context context,
-      @Nullable DartEntrypoint dartEntrypoint) {
+      @Nullable DartEntrypoint dartEntrypoint,
+      @Nullable String initialRoute) {
     return createAndRunEngine(
-        new Options(context).setDartEntrypoint(dartEntrypoint));
+        new Options(context).setDartEntrypoint(dartEntrypoint).setInitialRoute(initialRoute));
   }
 
   /**
@@ -120,7 +141,11 @@ public class FlutterEngineGroup {
 
     Context context = options.getContext();
     DartEntrypoint dartEntrypoint = options.getDartEntrypoint();
+    String initialRoute = options.getInitialRoute();
     List<String> dartEntrypointArgs = options.getDartEntrypointArgs();
+    PlatformViewsController platformViewsController = options.getPlatformViewsController();
+    platformViewsController =
+        platformViewsController != null ? platformViewsController : new PlatformViewsController();
     boolean automaticallyRegisterPlugins = options.getAutomaticallyRegisterPlugins();
     boolean waitForRestorationData = options.getWaitForRestorationData();
 
@@ -132,8 +157,12 @@ public class FlutterEngineGroup {
       engine =
           createEngine(
               context,
+              platformViewsController,
               automaticallyRegisterPlugins,
               waitForRestorationData);
+      if (initialRoute != null) {
+        engine.getNavigationChannel().setInitialRoute(initialRoute);
+      }
       engine.getDartExecutor().executeDartEntrypoint(dartEntrypoint, dartEntrypointArgs);
     } else {
       engine =
@@ -142,7 +171,9 @@ public class FlutterEngineGroup {
               .spawn(
                   context,
                   dartEntrypoint,
+                  initialRoute,
                   dartEntrypointArgs,
+                  platformViewsController,
                   automaticallyRegisterPlugins,
                   waitForRestorationData);
     }
@@ -169,12 +200,14 @@ public class FlutterEngineGroup {
   @VisibleForTesting
   /* package */ FlutterEngine createEngine(
       Context context,
+      @NonNull PlatformViewsController platformViewsController,
       boolean automaticallyRegisterPlugins,
       boolean waitForRestorationData) {
     return new FlutterEngine(
         context, // Context.
         null, // FlutterLoader.
         null, // FlutterJNI.
+        platformViewsController, // PlatformViewsController.
         null, // String[]. The Dart VM has already started, this arguments will have no effect.
         automaticallyRegisterPlugins, // boolean.
         waitForRestorationData, // boolean.
@@ -185,7 +218,9 @@ public class FlutterEngineGroup {
   public static class Options {
     @NonNull private Context context;
     @Nullable private DartEntrypoint dartEntrypoint;
+    @Nullable private String initialRoute;
     @Nullable private List<String> dartEntrypointArgs;
+    @NonNull private PlatformViewsController platformViewsController;
     private boolean automaticallyRegisterPlugins = true;
     private boolean waitForRestorationData = false;
 
@@ -206,9 +241,22 @@ public class FlutterEngineGroup {
       return dartEntrypoint;
     }
 
+    /**
+     * The name of the initial Flutter `Navigator` `Route` to load. If this is null, it will default
+     * to the "/" route.
+     */
+    public String getInitialRoute() {
+      return initialRoute;
+    }
+
     /** Arguments passed as a list of string to Dart's entrypoint function. */
     public List<String> getDartEntrypointArgs() {
       return dartEntrypointArgs;
+    }
+
+    /** Manages platform views. */
+    public PlatformViewsController getPlatformViewsController() {
+      return platformViewsController;
     }
 
     /**
@@ -241,12 +289,34 @@ public class FlutterEngineGroup {
     }
 
     /**
+     * Setter for `initialRoute` property.
+     *
+     * @param initialRoute The name of the initial Flutter `Navigator` `Route` to load. If this is
+     *     null, it will default to the "/" route.
+     */
+    public Options setInitialRoute(String initialRoute) {
+      this.initialRoute = initialRoute;
+      return this;
+    }
+
+    /**
      * Setter for `dartEntrypointArgs` property.
      *
      * @param dartEntrypointArgs Arguments passed as a list of string to Dart's entrypoint function.
      */
     public Options setDartEntrypointArgs(List<String> dartEntrypointArgs) {
       this.dartEntrypointArgs = dartEntrypointArgs;
+      return this;
+    }
+
+    /**
+     * Setter for `platformViewsController` property.
+     *
+     * @param platformViewsController Manages platform views.
+     */
+    public Options setPlatformViewsController(
+        @NonNull PlatformViewsController platformViewsController) {
+      this.platformViewsController = platformViewsController;
       return this;
     }
 

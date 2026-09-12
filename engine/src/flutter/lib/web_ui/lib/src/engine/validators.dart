@@ -22,6 +22,17 @@ bool rrectIsValid(ui.RRect rrect) {
   return true;
 }
 
+bool rsuperellipseIsValid(ui.RSuperellipse rsuperellipse) {
+  assert(
+    !(rsuperellipse.left.isNaN ||
+        rsuperellipse.right.isNaN ||
+        rsuperellipse.top.isNaN ||
+        rsuperellipse.bottom.isNaN),
+    'RSuperellipse argument contained a NaN value.',
+  );
+  return true;
+}
+
 bool offsetIsValid(ui.Offset offset) {
   assert(!offset.dx.isNaN && !offset.dy.isNaN, 'Offset argument contained a NaN value.');
   return true;
@@ -35,4 +46,17 @@ bool matrix4IsValid(Float32List matrix4) {
 bool radiusIsValid(ui.Radius radius) {
   assert(!radius.x.isNaN && !radius.y.isNaN, 'Radius argument contained a NaN value.');
   return true;
+}
+
+/// Validates color and color stops used for a gradient.
+void validateColorStops(List<ui.Color> colors, List<double>? colorStops) {
+  if (colorStops == null) {
+    if (colors.length != 2) {
+      throw ArgumentError('"colors" must have length 2 if "colorStops" is omitted.');
+    }
+  } else {
+    if (colors.length != colorStops.length) {
+      throw ArgumentError('"colors" and "colorStops" arguments must have equal length.');
+    }
+  }
 }

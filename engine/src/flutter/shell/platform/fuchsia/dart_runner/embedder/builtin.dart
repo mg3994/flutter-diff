@@ -44,6 +44,11 @@ external void _scheduleMicrotask(void callback());
 _getScheduleMicrotaskClosure() => _scheduleMicrotask;
 
 @pragma('vm:entry-point')
+_setupHooks() {
+  VMLibraryHooks.platformScript = _scriptUri;
+}
+
+@pragma('vm:entry-point')
 _getPrintClosure() => _print;
 
 typedef EchoStringCallback = String? Function(String? str);

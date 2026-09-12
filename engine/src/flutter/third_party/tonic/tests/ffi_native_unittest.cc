@@ -5,10 +5,8 @@
 #include "flutter/testing/dart_isolate_runner.h"
 #include "flutter/testing/fixture_test.h"
 
-#include "lib/ui/dart_wrapper.h"
 #include "tonic/dart_args.h"
 #include "tonic/dart_wrappable.h"
-#include "tonic/typed_data/typed_list.h"
 
 namespace flutter {
 namespace testing {
@@ -46,7 +44,11 @@ class FfiNativeTest : public FixtureTest {
       : settings_(CreateSettingsForFixture()),
         vm_(DartVMRef::Create(settings_)),
         thread_(CreateNewThread()),
-        task_runners_(GetCurrentTestName(), thread_, thread_) {}
+        task_runners_(GetCurrentTestName(),
+                      thread_,
+                      thread_,
+                      thread_,
+                      thread_) {}
 
   ~FfiNativeTest() = default;
 

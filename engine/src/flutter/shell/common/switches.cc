@@ -96,6 +96,8 @@ void PrintUsage(const std::string& executable_name) {
 
   std::cerr << "Flutter Content Hash: " << GetFlutterContentHash() << std::endl;
 
+  std::cerr << "Skia Version: " << GetSkiaVersion() << std::endl;
+
   std::cerr << "Dart Version: " << GetDartVersion() << std::endl << std::endl;
 
   std::cerr << "Available Flags:" << std::endl;
@@ -275,6 +277,10 @@ Settings SettingsFromCommandLine(const fml::CommandLine& command_line,
   settings.disable_service_auth_codes =
       command_line.HasOption(FlagForSwitch(Switch::DisableServiceAuthCodes));
 
+  // Disable WebSocket origin checks for the VM service, if specified.
+  settings.disable_service_origin_check =
+      command_line.HasOption(FlagForSwitch(Switch::DisableServiceOriginCheck));
+
   // Allow fallback to automatic port selection if binding to a specified port
   // fails.
   settings.enable_service_port_fallback =
@@ -296,14 +302,32 @@ Settings SettingsFromCommandLine(const fml::CommandLine& command_line,
   settings.profile_startup =
       command_line.HasOption(FlagForSwitch(Switch::ProfileStartup));
 
+  settings.enable_software_rendering =
+      command_line.HasOption(FlagForSwitch(Switch::EnableSoftwareRendering));
+
   settings.endless_trace_buffer =
       command_line.HasOption(FlagForSwitch(Switch::EndlessTraceBuffer));
 
   settings.trace_startup =
       command_line.HasOption(FlagForSwitch(Switch::TraceStartup));
 
-  settings.enable_serial_gc =
-      command_line.HasOption(FlagForSwitch(Switch::EnableSerialGC));
+#if !FLUTTER_RELEASE
+  settings.trace_skia = true;
+
+  if (command_line.HasOption(FlagForSwitch(Switch::TraceSkia))) {
+    // If --trace-skia is specified, then log all Skia events.
+    settings.trace_skia_allowlist.reset();
+  } else {
+    std::string trace_skia_allowlist;
+    command_line.GetOptionValue(FlagForSwitch(Switch::TraceSkiaAllowlist),
+                                &trace_skia_allowlist);
+    if (trace_skia_allowlist.size()) {
+      settings.trace_skia_allowlist = ParseCommaDelimited(trace_skia_allowlist);
+    } else {
+      settings.trace_skia_allowlist = {"skia.shaders"};
+    }
+  }
+#endif  // !FLUTTER_RELEASE
 
   std::string trace_allowlist;
   command_line.GetOptionValue(FlagForSwitch(Switch::TraceAllowlist),
@@ -318,6 +342,9 @@ Settings SettingsFromCommandLine(const fml::CommandLine& command_line,
 
   settings.profile_microtasks =
       command_line.HasOption(FlagForSwitch(Switch::ProfileMicrotasks));
+
+  settings.skia_deterministic_rendering_on_cpu =
+      command_line.HasOption(FlagForSwitch(Switch::SkiaDeterministicRendering));
 
   settings.verbose_logging =
       command_line.HasOption(FlagForSwitch(Switch::VerboseLogging));
@@ -400,6 +427,48 @@ Settings SettingsFromCommandLine(const fml::CommandLine& command_line,
     }
   }
 
+  settings.use_test_fonts =
+      command_line.HasOption(FlagForSwitch(Switch::UseTestFonts));
+  settings.use_asset_fonts =
+      !command_line.HasOption(FlagForSwitch(Switch::DisableAssetFonts));
+
+#if FML_OS_IOS || FML_OS_IOS_SIMULATOR || SLIMPELLER
+// On these configurations, the Impeller flags are completely ignored with the
+// default taking hold.
+#else   // FML_OS_IOS && !FML_OS_IOS_SIMULATOR
+  {
+    std::string enable_impeller_value;
+    if (command_line.GetOptionValue(FlagForSwitch(Switch::EnableImpeller),
+                                    &enable_impeller_value)) {
+      settings.enable_impeller =
+          enable_impeller_value.empty() || "true" == enable_impeller_value;
+    }
+  }
+#endif  // FML_OS_IOS && !FML_OS_IOS_SIMULATOR
+
+  {
+    std::string impeller_backend_value;
+    if (command_line.GetOptionValue(FlagForSwitch(Switch::ImpellerBackend),
+                                    &impeller_backend_value)) {
+      if (!impeller_backend_value.empty()) {
+        settings.requested_rendering_backend = impeller_backend_value;
+      }
+    }
+  }
+
+  settings.enable_vulkan_validation =
+      command_line.HasOption(FlagForSwitch(Switch::EnableVulkanValidation));
+  settings.enable_opengl_gpu_tracing =
+      command_line.HasOption(FlagForSwitch(Switch::EnableOpenGLGPUTracing));
+  settings.enable_vulkan_gpu_tracing =
+      command_line.HasOption(FlagForSwitch(Switch::EnableVulkanGPUTracing));
+
+  settings.enable_embedder_api =
+      command_line.HasOption(FlagForSwitch(Switch::EnableEmbedderAPI));
+
+  settings.prefetched_default_font_manager = command_line.HasOption(
+      FlagForSwitch(Switch::PrefetchedDefaultFontManager));
+
   std::string all_dart_flags;
   if (command_line.GetOptionValue(FlagForSwitch(Switch::DartFlags),
                                   &all_dart_flags)) {
@@ -443,6 +512,12 @@ Settings SettingsFromCommandLine(const fml::CommandLine& command_line,
         std::stoi(resource_cache_max_bytes_threshold);
   }
 
+  settings.enable_platform_isolates =
+      command_line.HasOption(FlagForSwitch(Switch::EnablePlatformIsolates));
+
+  settings.enable_surface_control = command_line.HasOption(
+      FlagForSwitch(Switch::EnableAndroidHcppAndSurfaceControl));
+
   constexpr std::string_view kMergedThreadEnabled = "enabled";
   constexpr std::string_view kMergedThreadDisabled = "disabled";
   constexpr std::string_view kMergedThreadMergeAfterLaunch = "mergeAfterLaunch";
@@ -475,6 +550,13 @@ Settings SettingsFromCommandLine(const fml::CommandLine& command_line,
           Settings::MergedPlatformUIThread::kMergeAfterLaunch;
     }
   }
+
+  settings.enable_flutter_gpu =
+      command_line.HasOption(FlagForSwitch(Switch::EnableFlutterGPU));
+  settings.impeller_enable_lazy_shader_mode =
+      command_line.HasOption(FlagForSwitch(Switch::ImpellerLazyShaderMode));
+  settings.impeller_use_sdfs =
+      command_line.HasOption(FlagForSwitch(Switch::ImpellerUseSDFs));
 
   return settings;
 }

@@ -19,6 +19,8 @@ source_set("testing_lib") {
     "assertions.h",
     "debugger_detection.cc",
     "debugger_detection.h",
+    "display_list_testing.cc",
+    "display_list_testing.h",
     "logger_listener.cc",
     "logger_listener.h",
     "post_task_sync.cc",
@@ -36,7 +38,9 @@ source_set("testing_lib") {
   ]
 
   public_deps = [
+    "//flutter/display_list",
     "//flutter/fml",
+    "//flutter/impeller/typographer",
     "//flutter/third_party/googletest:gmock",
     "//flutter/third_party/googletest:gtest",
   ]
@@ -50,7 +54,7 @@ source_set("testing") {
 
   if (enable_unittests && is_linux) {
     # So that we can call gtk_init in main().
-    configs += [ "//flutter/shell/platform/linux/config:glib" ]
+    configs += [ "//flutter/shell/platform/linux/config:gtk" ]
   }
 
   public_deps = [ ":testing_lib" ]
@@ -75,7 +79,23 @@ source_set("dart") {
     "//flutter/common",
     "//flutter/runtime",
     "//flutter/runtime:libdart",
+    "//flutter/skia",
     "//flutter/third_party/tonic",
+  ]
+}
+
+source_set("skia") {
+  testonly = true
+
+  sources = [
+    "assertions_skia.cc",
+    "assertions_skia.h",
+    "canvas_test.h",
+  ]
+
+  public_deps = [
+    ":testing_lib",
+    "//flutter/skia",
   ]
 }
 
@@ -124,9 +144,135 @@ if (is_mac || is_ios) {
   }
 }
 
+if (enable_unittests && shell_enable_vulkan) {
+  source_set("vulkan") {
+    testonly = true
+
+    sources = [
+      "test_vulkan_context.cc",
+      "test_vulkan_context.h",
+      "test_vulkan_image.cc",
+      "test_vulkan_image.h",
+      "test_vulkan_surface.cc",
+      "test_vulkan_surface.h",
+    ]
+
+    defines = [ "TEST_VULKAN_PROCS" ]
+
+    deps = [
+      ":skia",
+      "//flutter/flutter_vma:flutter_skia_vma",
+      "//flutter/fml",
+      "//flutter/shell/common",
+      "//flutter/vulkan",
+      "//flutter/vulkan/procs",
+    ]
+
+    if (!is_fuchsia) {
+      deps += [ "//flutter/third_party/swiftshader" ]
+      configs += [ "//flutter/third_party/swiftshader:swiftshader_config" ]
+    }
+  }
+}
+
 if (enable_unittests) {
   test_fixtures("testing_fixtures") {
     fixtures = []
+  }
+}
+
+# All targets on all platforms should be able to use the Metal utilities. On
+# platforms where Metal is not available, the tests must be skipped or
+# implemented to use another available client rendering API. This is usually
+# either OpenGL which is portably implemented via SwiftShader or the software
+# backend. This way, all tests compile on all platforms but the Metal backend
+# is exercised on platforms where Metal itself is available.
+#
+# On iOS, this is enabled to allow for Metal tests to run within a test app
+if (is_mac || is_ios) {
+  source_set("metal") {
+    testonly = true
+
+    if (shell_enable_metal) {
+      cflags_objc = flutter_cflags_objc
+      cflags_objcc = flutter_cflags_objcc
+
+      sources = [
+        "test_metal_context.h",
+        "test_metal_context.mm",
+        "test_metal_surface.h",
+        "test_metal_surface.mm",
+        "test_metal_surface_impl.h",
+        "test_metal_surface_impl.mm",
+      ]
+      deps = [ "//flutter/fml" ]
+      public_deps = [ ":skia" ]
+
+      # Skia's Vulkan support is enabled for all platforms (except iOS), and so parts of
+      # Skia's graphics context reference Vulkan symbols.
+      if (shell_enable_vulkan) {
+        deps += [ "//flutter/vulkan" ]
+      }
+    }
+  }
+}
+
+if (!is_ios) {
+  source_set("test_swiftshader_utils") {
+    sources = [
+      "test_swiftshader_utils.cc",
+      "test_swiftshader_utils.h",
+    ]
+
+    configs += [ "//flutter/third_party/swiftshader:swiftshader_config" ]
+
+    deps = [
+      "//flutter/fml",
+      "//flutter/third_party/swiftshader",
+    ]
+  }
+}
+
+if (current_toolchain == host_toolchain) {
+  source_set("test_swangle_utils") {
+    sources = [
+      "test_swangle_utils.cc",
+      "test_swangle_utils.h",
+    ]
+
+    public_configs = [ "//flutter/third_party/angle:external_config" ]
+
+    deps = [ "//flutter/fml" ]
+    public_deps = [
+      "//flutter/third_party/angle:libEGL_static",
+      "//flutter/third_party/angle:libGLESv2_static",
+    ]
+  }
+}
+
+# We only use SwiftShader on unittests
+use_swiftshader = enable_unittests && shell_enable_gl
+if (use_swiftshader) {
+  source_set("opengl") {
+    testonly = true
+
+    sources = [
+      "test_gl_context.cc",
+      "test_gl_context.h",
+      "test_gl_surface.cc",
+      "test_gl_surface.h",
+      "test_gl_utils.cc",
+      "test_gl_utils.h",
+    ]
+
+    deps = [
+      ":skia",
+      ":test_swangle_utils",
+      "//flutter/fml",
+    ]
+
+    configs -= [ "//build/config/clang:extra_warnings" ]
+    configs += [ "//flutter/third_party/angle:gl_prototypes" ]
   }
 }
 
@@ -140,5 +286,13 @@ if (enable_unittests) {
       "//flutter/third_party/googletest:gtest",
       "//flutter/third_party/googletest:gtest_main",
     ]
+
+    if (test_enable_metal) {
+      cflags_objc = flutter_cflags_objc
+      cflags_objcc = flutter_cflags_objcc
+
+      sources += [ "test_metal_surface_unittests.mm" ]
+      deps += [ ":metal" ]
+    }
   }
 }

@@ -43,21 +43,59 @@ class TestFlutterWindowsApi : public testing::StubFlutterWindowsApi {
     return true;
   }
 
+  // |flutter::testing::StubFlutterWindowsApi|
+  uint64_t EngineProcessMessages() override { return 99; }
+
+  // |flutter::testing::StubFlutterWindowsApi|
+  void EngineSetNextFrameCallback(VoidCallback callback,
+                                  void* user_data) override {
+    next_frame_callback_ = callback;
+    next_frame_user_data_ = user_data;
+  }
+
+  // |flutter::testing::StubFlutterWindowsApi|
+  void EngineReloadSystemFonts() override { reload_fonts_called_ = true; }
+
+  // |flutter::testing::StubFlutterWindowsApi|
+  bool EngineProcessExternalWindowMessage(FlutterDesktopEngineRef engine,
+                                          HWND hwnd,
+                                          UINT message,
+                                          WPARAM wparam,
+                                          LPARAM lparam,
+                                          LRESULT* result) override {
+    last_external_message_ = message;
+    return false;
+  }
+
   bool create_called() { return create_called_; }
 
   bool run_called() { return run_called_; }
 
   bool destroy_called() { return destroy_called_; }
 
+  bool reload_fonts_called() { return reload_fonts_called_; }
+
   const std::vector<std::string>& dart_entrypoint_arguments() {
     return dart_entrypoint_arguments_;
   }
+
+  bool has_next_frame_callback() { return next_frame_callback_ != nullptr; }
+  void run_next_frame_callback() {
+    next_frame_callback_(next_frame_user_data_);
+    next_frame_callback_ = nullptr;
+  }
+
+  UINT last_external_message() { return last_external_message_; }
 
  private:
   bool create_called_ = false;
   bool run_called_ = false;
   bool destroy_called_ = false;
+  bool reload_fonts_called_ = false;
   std::vector<std::string> dart_entrypoint_arguments_;
+  VoidCallback next_frame_callback_ = nullptr;
+  void* next_frame_user_data_ = nullptr;
+  UINT last_external_message_ = 0;
 };
 
 }  // namespace
@@ -108,6 +146,30 @@ TEST(FlutterEngineTest, ExplicitShutDown) {
   EXPECT_EQ(test_api->destroy_called(), true);
 }
 
+TEST(FlutterEngineTest, ProcessMessages) {
+  testing::ScopedStubFlutterWindowsApi scoped_api_stub(
+      std::make_unique<TestFlutterWindowsApi>());
+  auto test_api = static_cast<TestFlutterWindowsApi*>(scoped_api_stub.stub());
+
+  FlutterEngine engine(DartProject(L"fake/project/path"));
+  engine.Run();
+
+  std::chrono::nanoseconds next_event_time = engine.ProcessMessages();
+  EXPECT_EQ(next_event_time.count(), 99);
+}
+
+TEST(FlutterEngineTest, ReloadFonts) {
+  testing::ScopedStubFlutterWindowsApi scoped_api_stub(
+      std::make_unique<TestFlutterWindowsApi>());
+  auto test_api = static_cast<TestFlutterWindowsApi*>(scoped_api_stub.stub());
+
+  FlutterEngine engine(DartProject(L"fake/project/path"));
+  engine.Run();
+
+  engine.ReloadSystemFonts();
+  EXPECT_TRUE(test_api->reload_fonts_called());
+}
+
 TEST(FlutterEngineTest, GetMessenger) {
   DartProject project(L"data");
   testing::ScopedStubFlutterWindowsApi scoped_api_stub(
@@ -133,6 +195,36 @@ TEST(FlutterEngineTest, DartEntrypointArgs) {
   ASSERT_EQ(2, arguments_ref.size());
   EXPECT_TRUE(arguments[0] == arguments_ref[0]);
   EXPECT_TRUE(arguments[1] == arguments_ref[1]);
+}
+
+TEST(FlutterEngineTest, SetNextFrameCallback) {
+  DartProject project(L"data");
+  testing::ScopedStubFlutterWindowsApi scoped_api_stub(
+      std::make_unique<TestFlutterWindowsApi>());
+  auto test_api = static_cast<TestFlutterWindowsApi*>(scoped_api_stub.stub());
+
+  FlutterEngine engine(DartProject(L"fake/project/path"));
+
+  bool success = false;
+  engine.SetNextFrameCallback([&success]() { success = true; });
+
+  EXPECT_TRUE(test_api->has_next_frame_callback());
+
+  test_api->run_next_frame_callback();
+
+  EXPECT_TRUE(success);
+}
+
+TEST(FlutterEngineTest, ProcessExternalWindowMessage) {
+  testing::ScopedStubFlutterWindowsApi scoped_api_stub(
+      std::make_unique<TestFlutterWindowsApi>());
+  auto test_api = static_cast<TestFlutterWindowsApi*>(scoped_api_stub.stub());
+
+  FlutterEngine engine(DartProject(L"fake/project/path"));
+
+  engine.ProcessExternalWindowMessage(reinterpret_cast<HWND>(1), 1234, 0, 0);
+
+  EXPECT_EQ(test_api->last_external_message(), 1234);
 }
 
 }  // namespace flutter

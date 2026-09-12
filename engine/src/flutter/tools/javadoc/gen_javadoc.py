@@ -71,14 +71,20 @@ def main():
       'io.flutter.embedding.engine',
       'io.flutter.embedding.engine.dart',
       'io.flutter.embedding.engine.loader',
+      'io.flutter.embedding.engine.mutatorsstack',
       'io.flutter.embedding.engine.plugins',
+      'io.flutter.embedding.engine.plugins.activity',
       'io.flutter.embedding.engine.plugins.broadcastreceiver',
       'io.flutter.embedding.engine.plugins.contentprovider',
       'io.flutter.embedding.engine.plugins.lifecycle',
       'io.flutter.embedding.engine.plugins.service',
+      'io.flutter.embedding.engine.renderer',
       'io.flutter.embedding.engine.systemchannels',
       'io.flutter.plugin.common',
+      'io.flutter.plugin.editing',
+      'io.flutter.plugin.platform',
       'io.flutter.util',
+      'io.flutter.view',
   ]
 
   android_package_list = os.path.join(SCRIPT_DIR, 'android_reference')

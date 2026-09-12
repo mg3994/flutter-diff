@@ -21,9 +21,17 @@
 #include "flutter/lib/ui/plugins/callback_cache.h"
 #include "flutter/runtime/dart_vm.h"
 #include "flutter/shell/common/switches.h"
+#include "flutter/shell/platform/android/android_context_vk_impeller.h"
+#include "flutter/shell/platform/android/android_rendering_selector.h"
+#include "flutter/shell/platform/android/context/android_context.h"
 #include "flutter/shell/platform/android/flutter_main.h"
+#include "impeller/base/validation.h"
+#include "impeller/toolkit/android/proc_table.h"
+#include "txt/platform.h"
 
 namespace flutter {
+
+constexpr int kMinimumAndroidApiLevelForImpeller = 29;
 
 extern "C" {
 #if FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG
@@ -37,10 +45,28 @@ namespace {
 
 fml::jni::ScopedJavaGlobalRef<jclass>* g_flutter_jni_class = nullptr;
 
+// Workaround for crashes in Vivante GL driver on Android.
+//
+// See:
+//   * https://github.com/flutter/flutter/issues/167850
+//   * http://crbug.com/141785
+#ifdef FML_OS_ANDROID
+bool IsVivante() {
+  char product_model[PROP_VALUE_MAX];
+  __system_property_get("ro.hardware.egl", product_model);
+  return strcmp(product_model, "VIVANTE") == 0;
+}
+#else
+bool IsVivante() {
+  return false;
+}
+#endif  // FML_OS_ANDROID
+
 }  // anonymous namespace
 
-FlutterMain::FlutterMain(const flutter::Settings& settings)
-    : settings_(settings) {}
+FlutterMain::FlutterMain(const flutter::Settings& settings,
+                         flutter::AndroidRenderingAPI android_rendering_api)
+    : settings_(settings), android_rendering_api_(android_rendering_api) {}
 
 FlutterMain::~FlutterMain() = default;
 
@@ -54,6 +80,10 @@ FlutterMain& FlutterMain::Get() {
 
 const flutter::Settings& FlutterMain::GetSettings() const {
   return settings_;
+}
+
+flutter::AndroidRenderingAPI FlutterMain::GetAndroidRenderingAPI() {
+  return android_rendering_api_;
 }
 
 void FlutterMain::Init(JNIEnv* env,
@@ -77,6 +107,8 @@ void FlutterMain::Init(JNIEnv* env,
   // Turn systracing on if ATrace_isEnabled is true and the user did not already
   // request systracing
   if (!settings.trace_systrace) {
+    settings.trace_systrace =
+        impeller::android::GetProcTable().TraceIsEnabled();
     if (settings.trace_systrace) {
       __android_log_print(
           ANDROID_LOG_INFO, "Flutter",
@@ -85,6 +117,27 @@ void FlutterMain::Init(JNIEnv* env,
           "Dart DevTools.");
     }
   }
+  // The API level must be provided from java, as the NDK function
+  // android_get_device_api_level() is only available on API 24 and greater, and
+  // Flutter still supports 21, 22, and 23.
+
+  AndroidRenderingAPI android_rendering_api =
+      SelectedRenderingAPI(settings, api_level);
+
+  settings.warn_on_impeller_opt_out = true;
+#if !SLIMPELLER
+  switch (android_rendering_api) {
+    case AndroidRenderingAPI::kSoftware:
+    case AndroidRenderingAPI::kSkiaOpenGLES:
+      settings.enable_impeller = false;
+      break;
+    case AndroidRenderingAPI::kImpellerOpenGLES:
+    case AndroidRenderingAPI::kImpellerVulkan:
+    case AndroidRenderingAPI::kImpellerAutoselect:
+      settings.enable_impeller = true;
+      break;
+  }
+#endif  // !SLIMPELLER
 
 #if FLUTTER_RELEASE
   // On most platforms the timeline is always disabled in release mode.
@@ -132,6 +185,8 @@ void FlutterMain::Init(JNIEnv* env,
                         static_cast<int>(message.size()), message.c_str());
   };
 
+  settings.enable_platform_isolates = true;
+
 #if FLUTTER_RUNTIME_MODE == FLUTTER_RUNTIME_MODE_DEBUG
   // There are no ownership concerns here as all mappings are owned by the
   // embedder and not the engine.
@@ -147,7 +202,7 @@ void FlutterMain::Init(JNIEnv* env,
 
   // Not thread safe. Will be removed when FlutterMain is refactored to no
   // longer be a singleton.
-  g_flutter_main.reset(new FlutterMain(settings));
+  g_flutter_main.reset(new FlutterMain(settings, android_rendering_api));
   g_flutter_main->SetupDartVMServiceUriCallback(env);
 }
 
@@ -180,6 +235,11 @@ void FlutterMain::SetupDartVMServiceUriCallback(JNIEnv* env) {
       });
 }
 
+static void PrefetchDefaultFontManager(JNIEnv* env, jclass jcaller) {
+  // Initialize a singleton owned by Skia.
+  txt::GetDefaultFontManager();
+}
+
 bool FlutterMain::Register(JNIEnv* env) {
   static const JNINativeMethod methods[] = {
       {
@@ -187,6 +247,11 @@ bool FlutterMain::Register(JNIEnv* env) {
           .signature = "(Landroid/content/Context;[Ljava/lang/String;Ljava/"
                        "lang/String;Ljava/lang/String;Ljava/lang/String;JI)V",
           .fnPtr = reinterpret_cast<void*>(&Init),
+      },
+      {
+          .name = "nativePrefetchDefaultFontManager",
+          .signature = "()V",
+          .fnPtr = reinterpret_cast<void*>(&PrefetchDefaultFontManager),
       },
   };
 
@@ -197,6 +262,44 @@ bool FlutterMain::Register(JNIEnv* env) {
   }
 
   return env->RegisterNatives(clazz, methods, std::size(methods)) == 0;
+}
+
+// static
+AndroidRenderingAPI FlutterMain::SelectedRenderingAPI(
+    const flutter::Settings& settings,
+    int api_level) {
+#if !SLIMPELLER
+  if (settings.enable_software_rendering) {
+    if (settings.enable_impeller) {
+      FML_CHECK(!settings.enable_impeller)
+          << "Impeller does not support software rendering. Either disable "
+             "software rendering or disable impeller.";
+    }
+    return AndroidRenderingAPI::kSoftware;
+  }
+
+  // Debug/Profile only functionality for testing a specific
+  // backend configuration.
+#ifndef FLUTTER_RELEASE
+  if (settings.requested_rendering_backend == "opengles" &&
+      settings.enable_impeller) {
+    return AndroidRenderingAPI::kImpellerOpenGLES;
+  }
+  if (settings.requested_rendering_backend == "vulkan" &&
+      settings.enable_impeller) {
+    return AndroidRenderingAPI::kImpellerVulkan;
+  }
+#endif
+
+  if (settings.enable_impeller &&
+      api_level >= kMinimumAndroidApiLevelForImpeller && !IsVivante()) {
+    return AndroidRenderingAPI::kImpellerAutoselect;
+  }
+
+  return AndroidRenderingAPI::kSkiaOpenGLES;
+#else
+  return AndroidRenderingAPI::kImpellerAutoselect;
+#endif  // !SLIMPELLER
 }
 
 }  // namespace flutter

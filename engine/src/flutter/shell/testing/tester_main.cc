@@ -10,6 +10,7 @@
 
 #include "flutter/assets/asset_manager.h"
 #include "flutter/assets/directory_asset_bundle.h"
+#include "flutter/flow/embedded_views.h"
 #include "flutter/fml/build_config.h"
 #include "flutter/fml/file.h"
 #include "flutter/fml/make_copyable.h"
@@ -18,13 +19,21 @@
 #include "flutter/fml/synchronization/waitable_event.h"
 #include "flutter/fml/task_runner.h"
 #include "flutter/shell/common/platform_view.h"
+#include "flutter/shell/common/rasterizer.h"
 #include "flutter/shell/common/shell.h"
 #include "flutter/shell/common/switches.h"
 #include "flutter/shell/common/thread_host.h"
+#include "flutter/shell/gpu/gpu_surface_software.h"
 
 #include "third_party/abseil-cpp/absl/base/no_destructor.h"
 #include "third_party/dart/runtime/include/bin/dart_io_api.h"
 #include "third_party/dart/runtime/include/dart_api.h"
+#include "third_party/skia/include/core/SkSurface.h"
+
+#include "flutter/shell/testing/tester_context.h"
+#include "flutter/shell/testing/tester_context_gles_factory.h"
+#include "flutter/shell/testing/tester_context_mtl_factory.h"
+#include "flutter/shell/testing/tester_context_vk_factory.h"
 
 #if defined(FML_OS_WIN)
 #include <combaseapi.h>
@@ -38,14 +47,167 @@ namespace flutter {
 
 static absl::NoDestructor<std::unique_ptr<Shell>> g_shell;
 
-class TesterPlatformView : public PlatformView {
- public:
-  TesterPlatformView(Delegate& delegate, const TaskRunners& task_runners)
-      : PlatformView(delegate, task_runners) {}
+namespace {
+std::unique_ptr<TesterContext> CreateTesterContext(const Settings& settings) {
+  std::unique_ptr<TesterContext> tester_context;
+#if TESTER_ENABLE_METAL
+  if (settings.enable_impeller &&
+      settings.requested_rendering_backend == "metal") {
+    tester_context = TesterContextMTLFactory::Create();
+  }
+#endif
+#if TESTER_ENABLE_OPENGLES
+  if (settings.enable_impeller &&
+      settings.requested_rendering_backend == "opengles") {
+    tester_context = TesterContextGLESFactory::Create();
+  }
+#endif
+#if TESTER_ENABLE_VULKAN
+  if (settings.enable_impeller &&
+      (!settings.requested_rendering_backend.has_value() ||
+       settings.requested_rendering_backend == "vulkan")) {
+    tester_context =
+        TesterContextVKFactory::Create(settings.enable_vulkan_validation);
+  }
+#endif
+  return tester_context;
+}
+}  // namespace
 
-  ~TesterPlatformView() {}
+static constexpr int64_t kImplicitViewId = 0ll;
+
+static void ConfigureShell(Shell* shell) {
+  auto device_pixel_ratio = 3.0;
+  auto physical_width = 2400.0;   // 800 at 3x resolution.
+  auto physical_height = 1800.0;  // 600 at 3x resolution.
+
+  std::vector<std::unique_ptr<Display>> displays;
+  displays.push_back(std::make_unique<Display>(
+      0, 60, physical_width, physical_height, device_pixel_ratio));
+  shell->OnDisplayUpdates(std::move(displays));
+
+  flutter::ViewportMetrics metrics{};
+  metrics.device_pixel_ratio = device_pixel_ratio;
+  metrics.physical_width = physical_width;
+  metrics.physical_height = physical_height;
+  metrics.display_id = 0;
+  metrics.physical_min_width_constraint = physical_width;
+  metrics.physical_max_width_constraint = physical_width;
+  metrics.physical_min_height_constraint = physical_height;
+  metrics.physical_max_height_constraint = physical_height;
+  shell->GetPlatformView()->SetViewportMetrics(kImplicitViewId, metrics);
+}
+
+class TesterExternalViewEmbedder : public ExternalViewEmbedder {
+  // |ExternalViewEmbedder|
+  DlCanvas* GetRootCanvas() override { return nullptr; }
+
+  // |ExternalViewEmbedder|
+  void CancelFrame() override {}
+
+  // |ExternalViewEmbedder|
+  void BeginFrame(GrDirectContext* context,
+                  const fml::RefPtr<fml::RasterThreadMerger>&
+                      raster_thread_merger) override {}
+
+  // |ExternalViewEmbedder|
+  void PrepareFlutterView(DlISize frame_size,
+                          double device_pixel_ratio) override {}
+
+  // |ExternalViewEmbedder|
+  void PrerollCompositeEmbeddedView(
+      int64_t view_id,
+      std::unique_ptr<EmbeddedViewParams> params) override {}
+
+  // |ExternalViewEmbedder|
+  DlCanvas* CompositeEmbeddedView(int64_t view_id) override {
+    return &builder_;
+  }
 
  private:
+  DisplayListBuilder builder_;
+};
+
+class TesterGPUSurfaceSoftware : public GPUSurfaceSoftware {
+ public:
+  TesterGPUSurfaceSoftware(GPUSurfaceSoftwareDelegate* delegate,
+                           bool render_to_surface)
+      : GPUSurfaceSoftware(delegate, render_to_surface) {}
+
+  bool EnableRasterCache() const override { return false; }
+};
+
+class TesterPlatformView : public PlatformView,
+                           public GPUSurfaceSoftwareDelegate {
+ public:
+  TesterPlatformView(Delegate& delegate,
+                     const TaskRunners& task_runners,
+                     std::unique_ptr<TesterContext> tester_context)
+      : PlatformView(delegate, task_runners),
+        tester_context_(std::move(tester_context)) {}
+
+  ~TesterPlatformView() {
+    // TesterContext destructor handles shutdown
+  }
+
+  // |PlatformView|
+  std::shared_ptr<impeller::Context> GetImpellerContext() const override {
+    if (tester_context_) {
+      return tester_context_->GetImpellerContext();
+    }
+    return nullptr;
+  }
+
+  // |PlatformView|
+  std::unique_ptr<Surface> CreateRenderingSurface() override {
+    if (tester_context_ &&
+        delegate_.OnPlatformViewGetSettings().enable_impeller) {
+      return tester_context_->CreateRenderingSurface();
+    }
+    auto surface = std::make_unique<TesterGPUSurfaceSoftware>(
+        this, true /* render to surface */);
+    FML_DCHECK(surface->IsValid());
+    return surface;
+  }
+
+  // |GPUSurfaceSoftwareDelegate|
+  sk_sp<SkSurface> AcquireBackingStore(const DlISize& size) override {
+    if (sk_surface_ != nullptr &&  //
+        sk_surface_->width() == size.width &&
+        sk_surface_->height() == size.height) {
+      // The old and new surface sizes are the same. Nothing to do here.
+      return sk_surface_;
+    }
+
+    SkImageInfo info = SkImageInfo::MakeN32(
+        size.width, size.height, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+    sk_surface_ = SkSurfaces::Raster(info, nullptr);
+
+    if (sk_surface_ == nullptr) {
+      FML_LOG(ERROR)
+          << "Could not create backing store for software rendering.";
+      return nullptr;
+    }
+
+    return sk_surface_;
+  }
+
+  // |GPUSurfaceSoftwareDelegate|
+  bool PresentBackingStore(sk_sp<SkSurface> backing_store) override {
+    return true;
+  }
+
+  // |PlatformView|
+  std::shared_ptr<ExternalViewEmbedder> CreateExternalViewEmbedder() override {
+    return external_view_embedder_;
+  }
+
+ private:
+  sk_sp<SkSurface> sk_surface_ = nullptr;
+
+  std::shared_ptr<TesterContext> tester_context_;
+  std::shared_ptr<TesterExternalViewEmbedder> external_view_embedder_ =
+      std::make_shared<TesterExternalViewEmbedder>();
 };
 
 // Checks whether the engine's main Dart isolate has no pending work.  If so,
@@ -138,32 +300,53 @@ int RunTester(const flutter::Settings& settings,
 
   std::unique_ptr<ThreadHost> threadhost;
   fml::RefPtr<fml::TaskRunner> platform_task_runner;
+  fml::RefPtr<fml::TaskRunner> raster_task_runner;
   fml::RefPtr<fml::TaskRunner> ui_task_runner;
+  fml::RefPtr<fml::TaskRunner> io_task_runner;
 
   if (multithreaded) {
     threadhost = std::make_unique<ThreadHost>(
-        thread_label, ThreadHost::Type::kPlatform | ThreadHost::Type::kUi);
+        thread_label, ThreadHost::Type::kPlatform | ThreadHost::Type::kIo |
+                          ThreadHost::Type::kUi | ThreadHost::Type::kRaster);
     platform_task_runner = current_task_runner;
+    raster_task_runner = threadhost->raster_thread->GetTaskRunner();
     ui_task_runner = threadhost->ui_thread->GetTaskRunner();
+    io_task_runner = threadhost->io_thread->GetTaskRunner();
   } else {
-    platform_task_runner = ui_task_runner = current_task_runner;
+    platform_task_runner = raster_task_runner = ui_task_runner =
+        io_task_runner = current_task_runner;
   }
 
   const flutter::TaskRunners task_runners(thread_label,  // dart thread label
                                           platform_task_runner,  // platform
-                                          ui_task_runner         // ui
+                                          raster_task_runner,    // raster
+                                          ui_task_runner,        // ui
+                                          io_task_runner         // io
   );
 
+  std::unique_ptr<TesterContext> tester_context = CreateTesterContext(settings);
+  if (settings.enable_impeller && !tester_context) {
+    FML_LOG(ERROR) << "Could not create tester context.";
+    return EXIT_FAILURE;
+  }
+
   Shell::CreateCallback<PlatformView> on_create_platform_view =
-      fml::MakeCopyable([](Shell& shell) mutable {
-        return std::make_unique<TesterPlatformView>(shell,
-                                                    shell.GetTaskRunners());
-      });
+      fml::MakeCopyable(
+          [tester_context = std::move(tester_context)](Shell& shell) mutable {
+            return std::make_unique<TesterPlatformView>(
+                shell, shell.GetTaskRunners(), std::move(tester_context));
+          });
+
+  Shell::CreateCallback<Rasterizer> on_create_rasterizer = [](Shell& shell) {
+    return std::make_unique<Rasterizer>(
+        shell, Rasterizer::MakeGpuImageBehavior::kBitmap);
+  };
 
   g_shell->reset(Shell::Create(flutter::PlatformData(),  //
                                task_runners,             //
                                settings,                 //
-                               on_create_platform_view   //
+                               on_create_platform_view,  //
+                               on_create_rasterizer      //
                                )
                      .release());
   auto shell = g_shell->get();
@@ -257,6 +440,8 @@ int RunTester(const flutter::Settings& settings,
                      }
                    });
 
+  ConfigureShell(shell);
+
   // Run the message loop and wait for the script to do its thing.
   fml::MessageLoop::GetCurrent().Run();
 
@@ -315,15 +500,26 @@ EXPORTED void Spawn(const char* entrypoint, const char* route) {
 
     Shell::CreateCallback<PlatformView> on_create_platform_view =
         fml::MakeCopyable([](Shell& shell) mutable {
-          return std::make_unique<TesterPlatformView>(shell,
-                                                      shell.GetTaskRunners());
+          std::unique_ptr<TesterContext> tester_context =
+              CreateTesterContext(shell.GetSettings());
+          return std::make_unique<TesterPlatformView>(
+              shell, shell.GetTaskRunners(), std::move(tester_context));
         });
+
+    Shell::CreateCallback<Rasterizer> on_create_rasterizer = [](Shell& shell) {
+      return std::make_unique<Rasterizer>(
+          shell, Rasterizer::MakeGpuImageBehavior::kBitmap);
+    };
 
     // Spawn a shell, and keep it running until it has no live ports, then
     // delete it on the platform thread.
     auto spawned_shell =
-        shell->Spawn(std::move(configuration), on_create_platform_view)
+        shell
+            ->Spawn(std::move(configuration), route, on_create_platform_view,
+                    on_create_rasterizer)
             .release();
+
+    ConfigureShell(spawned_shell);
 
     fml::TaskRunner::RunNowOrPostTask(
         spawned_shell->GetTaskRunners().GetUITaskRunner(), [spawned_shell]() {
@@ -392,6 +588,7 @@ int main(int argc, char* argv[]) {
   }
 
   settings.leak_vm = false;
+  settings.enable_platform_isolates = true;
 
   if (settings.icu_data_path.empty()) {
     settings.icu_data_path = "icudtl.dat";

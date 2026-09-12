@@ -30,6 +30,27 @@ class StubFlutterWindowsApi {
 
   virtual ~StubFlutterWindowsApi() {}
 
+  // Called for FlutterDesktopViewControllerCreate.
+  virtual FlutterDesktopViewControllerRef
+  ViewControllerCreate(int width, int height, FlutterDesktopEngineRef engine) {
+    return nullptr;
+  }
+
+  // Called for FlutterDesktopViewControllerDestroy.
+  virtual void ViewControllerDestroy() {}
+
+  // Called for FlutterDesktopViewControllerForceRedraw.
+  virtual void ViewControllerForceRedraw() {}
+
+  // Called for FlutterDesktopViewControllerHandleTopLevelWindowProc.
+  virtual bool ViewControllerHandleTopLevelWindowProc(HWND hwnd,
+                                                      UINT message,
+                                                      WPARAM wparam,
+                                                      LPARAM lparam,
+                                                      LRESULT* result) {
+    return false;
+  }
+
   // Called for FlutterDesktopEngineCreate.
   virtual FlutterDesktopEngineRef EngineCreate(
       const FlutterDesktopEngineProperties& engine_properties) {
@@ -42,13 +63,77 @@ class StubFlutterWindowsApi {
   // Called for FlutterDesktopEngineRun.
   virtual bool EngineRun(const char* entry_point) { return true; }
 
-  virtual FlutterDesktopMessengerRef PluginRegistrarGetMessenger() {
-    return nullptr;
-  }
+  // Called for FlutterDesktopEngineProcessMessages.
+  virtual uint64_t EngineProcessMessages() { return 0; }
 
   // Called for FlutterDesktopEngineSetNextFrameCallback.
   virtual void EngineSetNextFrameCallback(VoidCallback callback,
                                           void* user_data) {}
+
+  // Called for FlutterDesktopEngineIsPlatformThread.
+  virtual bool EngineIsPlatformThread() { return false; }
+
+  // Called for FlutterDesktopEnginePostPlatformThreadTask.
+  virtual void EnginePostPlatformThreadTask(VoidCallback callback,
+                                            VoidCallback on_cancel,
+                                            void* user_data) {}
+
+  // Called for FlutterDesktopEngineReloadSystemFonts.
+  virtual void EngineReloadSystemFonts() {}
+
+  // Called for FlutterDesktopEngineRegisterPlatformViewType.
+  virtual void EngineRegisterPlatformViewType(
+      const char* view_type_name,
+      FlutterPlatformViewTypeEntry view_type) {}
+
+  // Called for FlutterDesktopViewGetHWND.
+  virtual HWND ViewGetHWND() { return reinterpret_cast<HWND>(1); }
+
+  // Called for FlutterDesktopViewGetGraphicsAdapter.
+  virtual IDXGIAdapter* ViewGetGraphicsAdapter() {
+    return reinterpret_cast<IDXGIAdapter*>(2);
+  }
+
+  // Called for FlutterDesktopEngineGetGraphicsAdapter.
+  virtual bool EngineGetGraphicsAdapter(IDXGIAdapter** adapter_out) {
+    *adapter_out = reinterpret_cast<IDXGIAdapter*>(3);
+    return true;
+  }
+
+  // Called for FlutterDesktopPluginRegistrarGetView.
+  virtual FlutterDesktopViewRef PluginRegistrarGetView() { return nullptr; }
+
+  // Called for FlutterDesktopPluginRegistrarGetViewById.
+  virtual FlutterDesktopViewRef PluginRegistrarGetViewById(
+      FlutterDesktopViewId view_id) {
+    return nullptr;
+  }
+
+  // Called for FlutterDesktopPluginRegistrarRegisterTopLevelWindowProcDelegate.
+  virtual void PluginRegistrarRegisterTopLevelWindowProcDelegate(
+      FlutterDesktopWindowProcCallback delegate,
+      void* user_data) {}
+
+  // Called for
+  // FlutterDesktopPluginRegistrarUnregisterTopLevelWindowProcDelegate.
+  virtual void PluginRegistrarUnregisterTopLevelWindowProcDelegate(
+      FlutterDesktopWindowProcCallback delegate) {}
+
+  // Called for FlutterDesktopPluginRegistrarGetGraphicsAdapter.
+  virtual bool PluginRegistrarGetGraphicsAdapter(IDXGIAdapter** adapter_out) {
+    return false;
+  }
+
+  // Called for FlutterDesktopEngineProcessExternalWindowMessage.
+  virtual bool EngineProcessExternalWindowMessage(
+      FlutterDesktopEngineRef engine,
+      HWND hwnd,
+      UINT message,
+      WPARAM wparam,
+      LPARAM lparam,
+      LRESULT* result) {
+    return false;
+  }
 };
 
 // A test helper that owns a stub implementation, making it the test stub for

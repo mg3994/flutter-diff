@@ -8,6 +8,7 @@ import 'dart:developer' as developer;
 import 'package:ui/src/engine.dart';
 import 'package:ui/ui.dart' as ui;
 import 'package:ui/ui_web/src/ui_web.dart' as ui_web;
+import 'package:web_test_fonts/web_test_fonts.dart';
 
 /// The mode the app is running in.
 /// Keep these in sync with the same constants on the framework-side under foundation/constants.dart.
@@ -28,7 +29,7 @@ String get buildMode => kReleaseMode
 
 /// A benchmark metric that includes frame-related computations prior to
 /// submitting layer and picture operations to the underlying renderer, such as
-/// HTML and CanvasKit. During this phase we compute transforms, clips, and
+/// CanvasKit and Skwasm. During this phase we compute transforms, clips, and
 /// other information needed for rendering.
 const String kProfilePrerollFrame = 'preroll_frame';
 
@@ -154,6 +155,8 @@ Future<void> initializeEngineServices({
   assetManager ??= ui_web.AssetManager(assetBase: configuration.assetBase);
   _setAssetManager(assetManager);
 
+  Future<void> initializeRendererCallback() async => renderer.initialize();
+  await Future.wait<void>(<Future<void>>[initializeRendererCallback(), _downloadAssetFonts()]);
   _initializationState = DebugEngineInitializationState.initializedServices;
 }
 
@@ -179,9 +182,15 @@ Future<void> initializeEngineUi() async {
   }
   _initializationState = DebugEngineInitializationState.initializingUi;
 
+  RawKeyboard.initialize(onMacOs: ui_web.browser.operatingSystem == ui_web.OperatingSystem.macOs);
+  KeyboardBinding.initInstance();
+
   // Ensures Flutter renders a global "generator" meta-tag.
   ensureMetaTag('generator', 'Flutter');
 
+  if (!configuration.multiViewEnabled) {
+    ensureImplicitViewInitialized(hostElement: configuration.hostElement);
+  }
   _initializationState = DebugEngineInitializationState.initialized;
 }
 
@@ -197,4 +206,21 @@ void _setAssetManager(ui_web.AssetManager assetManager) {
   }
 
   _assetManager = assetManager;
+}
+
+Future<void> _downloadAssetFonts() async {
+  renderer.fontCollection.clear();
+
+  if (ui_web.TestEnvironment.instance.forceTestFonts) {
+    // Load the embedded test font before loading fonts from the assets so that
+    // the embedded test font is the default (first) font.
+    await renderer.fontCollection.loadFontFromBytes(
+      EmbeddedTestFont.flutterTest.data,
+      fontFamily: EmbeddedTestFont.flutterTest.fontFamily,
+    );
+  }
+
+  if (_debugAssetManager != null || _assetManager != null) {
+    await renderer.fontCollection.loadAssetFonts(await fetchFontManifest(ui_web.assetManager));
+  }
 }

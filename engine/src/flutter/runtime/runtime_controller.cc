@@ -8,8 +8,10 @@
 
 #include "flutter/common/settings.h"
 #include "flutter/fml/trace_event.h"
+#include "flutter/lib/ui/compositing/scene.h"
 #include "flutter/lib/ui/ui_dart_state.h"
 #include "flutter/lib/ui/window/platform_configuration.h"
+#include "flutter/lib/ui/window/viewport_metrics.h"
 #include "flutter/runtime/dart_isolate_group_data.h"
 #include "flutter/runtime/isolate_configuration.h"
 #include "flutter/runtime/runtime_delegate.h"
@@ -19,7 +21,10 @@ namespace flutter {
 
 RuntimeController::RuntimeController(RuntimeDelegate& p_client,
                                      const TaskRunners& task_runners)
-    : client_(p_client), vm_(nullptr), context_(task_runners) {}
+    : client_(p_client),
+      vm_(nullptr),
+      context_(task_runners),
+      pointer_data_packet_converter_(*this) {}
 
 RuntimeController::RuntimeController(
     RuntimeDelegate& p_client,
@@ -39,7 +44,8 @@ RuntimeController::RuntimeController(
       isolate_create_callback_(p_isolate_create_callback),
       isolate_shutdown_callback_(p_isolate_shutdown_callback),
       persistent_isolate_data_(std::move(p_persistent_isolate_data)),
-      context_(p_context) {}
+      context_(p_context),
+      pointer_data_packet_converter_(*this) {}
 
 std::unique_ptr<RuntimeController> RuntimeController::Spawn(
     RuntimeDelegate& p_client,
@@ -48,13 +54,26 @@ std::unique_ptr<RuntimeController> RuntimeController::Spawn(
     const std::function<void(int64_t)>& p_idle_notification_callback,
     const fml::closure& p_isolate_create_callback,
     const fml::closure& p_isolate_shutdown_callback,
-    const std::shared_ptr<const fml::Mapping>& p_persistent_isolate_data)
-    const {
+    const std::shared_ptr<const fml::Mapping>& p_persistent_isolate_data,
+    fml::WeakPtr<IOManager> io_manager,
+    fml::TaskRunnerAffineWeakPtr<ImageDecoder> image_decoder,
+    fml::TaskRunnerAffineWeakPtr<ImageGeneratorRegistry>
+        image_generator_registry,
+    fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate) const {
   UIDartState::Context spawned_context{
       context_.task_runners,
+      std::move(snapshot_delegate),
+      std::move(io_manager),
+      context_.unref_queue,
+      std::move(image_decoder),
+      std::move(image_generator_registry),
       advisory_script_uri,
       advisory_script_entrypoint,
+      context_.deterministic_rendering_enabled,
       context_.concurrent_task_runner,
+      context_.runtime_stage_backend,
+      context_.enable_impeller,
+      context_.enable_flutter_gpu,
   };
   auto result =
       std::make_unique<RuntimeController>(p_client,                      //
@@ -114,8 +133,108 @@ bool RuntimeController::FlushRuntimeStateToIsolate() {
     return false;
   }
 
+  for (auto const& [view_id, viewport_metrics] :
+       platform_data_.viewport_metrics_for_views) {
+    bool added = platform_configuration->AddView(view_id, viewport_metrics);
+
+    // Callbacks will have been already invoked if the engine was restarted.
+    if (pending_add_view_callbacks_.find(view_id) !=
+        pending_add_view_callbacks_.end()) {
+      pending_add_view_callbacks_[view_id](added);
+      pending_add_view_callbacks_.erase(view_id);
+    }
+
+    if (!added) {
+      FML_LOG(ERROR) << "Failed to flush view #" << view_id
+                     << ". The Dart isolate may be in an inconsistent state.";
+    }
+  }
+
   FML_DCHECK(pending_add_view_callbacks_.empty());
-  return SetLocales(platform_data_.locale_data);
+  return SetLocales(platform_data_.locale_data) &&
+         SetSemanticsEnabled(platform_data_.semantics_enabled) &&
+         SetAccessibilityFeatures(
+             platform_data_.accessibility_feature_flags_) &&
+         SetUserSettingsData(platform_data_.user_settings_data) &&
+         SetInitialLifecycleState(platform_data_.lifecycle_state) &&
+         SetDisplays(platform_data_.displays);
+}
+
+void RuntimeController::AddView(int64_t view_id,
+                                const ViewportMetrics& view_metrics,
+                                AddViewCallback callback) {
+  // If the Dart isolate is not running, |FlushRuntimeStateToIsolate| will
+  // add the view and invoke the callback when the isolate is started.
+  auto* platform_configuration = GetPlatformConfigurationIfAvailable();
+  if (!platform_configuration) {
+    FML_DCHECK(has_flushed_runtime_state_ == false);
+
+    if (pending_add_view_callbacks_.find(view_id) !=
+        pending_add_view_callbacks_.end()) {
+      FML_LOG(ERROR) << "View #" << view_id << " is already pending creation.";
+      callback(false);
+      return;
+    }
+
+    platform_data_.viewport_metrics_for_views[view_id] = view_metrics;
+    pending_add_view_callbacks_[view_id] = std::move(callback);
+    return;
+  }
+
+  FML_DCHECK(has_flushed_runtime_state_ || pending_add_view_callbacks_.empty());
+
+  platform_data_.viewport_metrics_for_views[view_id] = view_metrics;
+  bool added = platform_configuration->AddView(view_id, view_metrics);
+  if (added) {
+    ScheduleFrame();
+  }
+
+  callback(added);
+}
+
+bool RuntimeController::RemoveView(int64_t view_id) {
+  platform_data_.viewport_metrics_for_views.erase(view_id);
+
+  // If the Dart isolate has not been launched yet, the pending
+  // add view operation's callback is stored by the runtime controller.
+  // Notify this callback of the cancellation.
+  auto* platform_configuration = GetPlatformConfigurationIfAvailable();
+  if (!platform_configuration) {
+    FML_DCHECK(has_flushed_runtime_state_ == false);
+    if (pending_add_view_callbacks_.find(view_id) !=
+        pending_add_view_callbacks_.end()) {
+      pending_add_view_callbacks_[view_id](false);
+      pending_add_view_callbacks_.erase(view_id);
+    }
+
+    return false;
+  }
+
+  return platform_configuration->RemoveView(view_id);
+}
+
+bool RuntimeController::SendViewFocusEvent(const ViewFocusEvent& event) {
+  auto* platform_configuration = GetPlatformConfigurationIfAvailable();
+  if (!platform_configuration) {
+    return false;
+  }
+  return platform_configuration->SendFocusEvent(event);
+}
+
+bool RuntimeController::ViewExists(int64_t view_id) const {
+  return platform_data_.viewport_metrics_for_views.count(view_id) != 0;
+}
+
+bool RuntimeController::SetViewportMetrics(int64_t view_id,
+                                           const ViewportMetrics& metrics) {
+  TRACE_EVENT0("flutter", "SetViewportMetrics");
+
+  platform_data_.viewport_metrics_for_views[view_id] = metrics;
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    return platform_configuration->UpdateViewMetrics(view_id, metrics);
+  }
+
+  return false;
 }
 
 bool RuntimeController::SetLocales(
@@ -124,6 +243,73 @@ bool RuntimeController::SetLocales(
 
   if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
     platform_configuration->UpdateLocales(locale_data);
+    return true;
+  }
+
+  return false;
+}
+
+bool RuntimeController::SetUserSettingsData(const std::string& data) {
+  platform_data_.user_settings_data = data;
+
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->UpdateUserSettingsData(
+        platform_data_.user_settings_data);
+    return true;
+  }
+
+  return false;
+}
+
+bool RuntimeController::SetInitialLifecycleState(const std::string& data) {
+  platform_data_.lifecycle_state = data;
+
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->UpdateInitialLifecycleState(
+        platform_data_.lifecycle_state);
+    return true;
+  }
+
+  return false;
+}
+
+bool RuntimeController::SetSemanticsEnabled(bool enabled) {
+  platform_data_.semantics_enabled = enabled;
+
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->UpdateSemanticsEnabled(
+        platform_data_.semantics_enabled);
+    return true;
+  }
+
+  return false;
+}
+
+bool RuntimeController::SetAccessibilityFeatures(int32_t flags) {
+  platform_data_.accessibility_feature_flags_ = flags;
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->UpdateAccessibilityFeatures(
+        platform_data_.accessibility_feature_flags_);
+    return true;
+  }
+
+  return false;
+}
+
+bool RuntimeController::BeginFrame(fml::TimePoint frame_time,
+                                   uint64_t frame_number) {
+  MarkAsFrameBorder();
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->BeginFrame(frame_time, frame_number);
+    return true;
+  }
+
+  return false;
+}
+
+bool RuntimeController::ReportTimings(std::vector<int64_t> timings) {
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->ReportTimings(std::move(timings));
     return true;
   }
 
@@ -173,6 +359,45 @@ bool RuntimeController::DispatchPlatformMessage(
   return false;
 }
 
+bool RuntimeController::DispatchPointerDataPacket(
+    const PointerDataPacket& packet) {
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    TRACE_EVENT0("flutter", "RuntimeController::DispatchPointerDataPacket");
+    std::unique_ptr<PointerDataPacket> converted_packet =
+        pointer_data_packet_converter_.Convert(packet);
+    if (converted_packet->GetLength() != 0) {
+      platform_configuration->DispatchPointerDataPacket(*converted_packet);
+    }
+    return true;
+  }
+
+  return false;
+}
+
+HitTestResponse RuntimeController::HitTest(int64_t view_id,
+                                           const flutter::PointData offset) {
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    TRACE_EVENT0("flutter", "RuntimeController::HitTest");
+    return platform_configuration->HitTest(view_id, offset);
+  }
+  return {.has_platform_view = false};
+}
+
+bool RuntimeController::DispatchSemanticsAction(int64_t view_id,
+                                                int32_t node_id,
+                                                SemanticsAction action,
+                                                fml::MallocMapping args) {
+  TRACE_EVENT1("flutter", "RuntimeController::DispatchSemanticsAction", "mode",
+               "basic");
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->DispatchSemanticsAction(view_id, node_id, action,
+                                                    std::move(args));
+    return true;
+  }
+
+  return false;
+}
+
 PlatformConfiguration*
 RuntimeController::GetPlatformConfigurationIfAvailable() {
   std::shared_ptr<DartIsolate> root_isolate = root_isolate_.lock();
@@ -180,9 +405,73 @@ RuntimeController::GetPlatformConfigurationIfAvailable() {
 }
 
 // |PlatformConfigurationClient|
+std::string RuntimeController::DefaultRouteName() {
+  return client_.DefaultRouteName();
+}
+
+// |PlatformConfigurationClient|
+void RuntimeController::ScheduleFrame() {
+  client_.ScheduleFrame();
+}
+
+void RuntimeController::EndWarmUpFrame() {
+  client_.OnAllViewsRendered();
+}
+
+// |PlatformConfigurationClient|
+void RuntimeController::Render(int64_t view_id,
+                               Scene* scene,
+                               double width,
+                               double height) {
+  const ViewportMetrics* view_metrics =
+      UIDartState::Current()->platform_configuration()->GetMetrics(view_id);
+  if (view_metrics == nullptr) {
+    return;
+  }
+  client_.Render(view_id, scene->takeLayerTree(width, height),
+                 view_metrics->device_pixel_ratio);
+  rendered_views_during_frame_.insert(view_id);
+  CheckIfAllViewsRendered();
+}
+
+void RuntimeController::MarkAsFrameBorder() {
+  rendered_views_during_frame_.clear();
+}
+
+void RuntimeController::CheckIfAllViewsRendered() {
+  if (rendered_views_during_frame_.size() != 0 &&
+      rendered_views_during_frame_.size() ==
+          platform_data_.viewport_metrics_for_views.size()) {
+    client_.OnAllViewsRendered();
+    MarkAsFrameBorder();
+  }
+}
+
+// |PlatformConfigurationClient|
+void RuntimeController::UpdateSemantics(int64_t view_id,
+                                        SemanticsUpdate* update) {
+  client_.UpdateSemantics(view_id, update->takeNodes(), update->takeActions());
+}
+
+// |PlatformConfigurationClient|
+void RuntimeController::SetApplicationLocale(std::string locale) {
+  client_.SetApplicationLocale(std::move(locale));
+}
+
+// |PlatformConfigurationClient|
+void RuntimeController::SetSemanticsTreeEnabled(bool enabled) {
+  client_.SetSemanticsTreeEnabled(enabled);
+}
+
+// |PlatformConfigurationClient|
 void RuntimeController::HandlePlatformMessage(
     std::unique_ptr<PlatformMessage> message) {
   client_.HandlePlatformMessage(std::move(message));
+}
+
+// |PlatformConfigurationClient|
+FontCollection& RuntimeController::GetFontCollection() {
+  return client_.GetFontCollection();
 }
 
 // |PlatfromConfigurationClient|
@@ -194,6 +483,11 @@ std::shared_ptr<AssetManager> RuntimeController::GetAssetManager() {
 void RuntimeController::UpdateIsolateDescription(const std::string isolate_name,
                                                  int64_t isolate_port) {
   client_.UpdateIsolateDescription(isolate_name, isolate_port);
+}
+
+// |PlatformConfigurationClient|
+void RuntimeController::SetNeedsReportTimings(bool value) {
+  client_.SetNeedsReportTimings(value);
 }
 
 // |PlatformConfigurationClient|
@@ -361,6 +655,27 @@ void RuntimeController::LoadDartDeferredLibraryError(
 
 void RuntimeController::RequestDartDeferredLibrary(intptr_t loading_unit_id) {
   return client_.RequestDartDeferredLibrary(loading_unit_id);
+}
+
+bool RuntimeController::SetDisplays(const std::vector<DisplayData>& displays) {
+  TRACE_EVENT0("flutter", "SetDisplays");
+  platform_data_.displays = displays;
+
+  if (auto* platform_configuration = GetPlatformConfigurationIfAvailable()) {
+    platform_configuration->UpdateDisplays(displays);
+    return true;
+  }
+  return false;
+}
+
+double RuntimeController::GetScaledFontSize(double unscaled_font_size,
+                                            int configuration_id) const {
+  return client_.GetScaledFontSize(unscaled_font_size, configuration_id);
+}
+
+void RuntimeController::RequestViewFocusChange(
+    const ViewFocusChangeRequest& request) {
+  client_.RequestViewFocusChange(request);
 }
 
 void RuntimeController::ShutdownPlatformIsolates() {

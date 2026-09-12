@@ -18,10 +18,7 @@ const _swiftPackageTemplate = '''
 
 import PackageDescription
 
-{{#hasSwiftCodeBefore}}
-{{swiftCodeBefore}}
-
-{{/hasSwiftCodeBefore}}
+{{#hasSwiftCodeBefore}}\n{{swiftCodeBefore}}\n\n{{/hasSwiftCodeBefore}}
 let package = Package(
     name: "{{packageName}}",
     {{#platforms}}
@@ -123,17 +120,11 @@ class SwiftPackage {
       final Directory targetDirectory = _manifest.parent
           .childDirectory('Sources')
           .childDirectory(target.name);
-      if (generateEmptySources) {
+      if (generateEmptySources &&
+          (!targetDirectory.existsSync() || targetDirectory.listSync().isEmpty)) {
         final File requiredSwiftFile = targetDirectory.childFile('${target.name}.swift');
-        // Skip creating placeholder sources if sources already exist in the
-        // target directory to avoid unnecessary file writes during build.
-        final bool hasSources =
-            requiredSwiftFile.existsSync() ||
-            (targetDirectory.existsSync() && targetDirectory.listSync().isNotEmpty);
-        if (!hasSources) {
-          requiredSwiftFile.createSync(recursive: true);
-          requiredSwiftFile.writeAsStringSync(_swiftPackageSourceTemplate);
-        }
+        requiredSwiftFile.createSync(recursive: true);
+        requiredSwiftFile.writeAsStringSync(_swiftPackageSourceTemplate);
       }
     }
 
@@ -141,24 +132,8 @@ class SwiftPackage {
       _swiftPackageTemplate,
       _templateContext,
     );
-
-    // Skip writing Package.swift if the existing file content is identical to
-    // renderedTemplate. Preserving file modification time (mtime) prevents
-    // Xcode and Swift Package Manager from invalidating caches and re-resolving
-    // dependencies during parallel builds.
-    var shouldWrite = true;
-    try {
-      if (_manifest.existsSync() && _manifest.readAsStringSync() == renderedTemplate) {
-        shouldWrite = false;
-      }
-    } on FileSystemException {
-      // If reading fails, write it anyway.
-    }
-
-    if (shouldWrite) {
-      _manifest.createSync(recursive: true);
-      _manifest.writeAsStringSync(renderedTemplate);
-    }
+    _manifest.createSync(recursive: true);
+    _manifest.writeAsStringSync(renderedTemplate);
   }
 
   String? _formatPlatforms() {

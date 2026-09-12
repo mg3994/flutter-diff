@@ -27,6 +27,8 @@ class Thread {
     kNormal,
     /// Suitable for threads which generate data for the display.
     kDisplay,
+    /// Suitable for thread which raster data.
+    kRaster,
   };
 
   /// The ThreadConfig is the thread info include thread name, thread priority.

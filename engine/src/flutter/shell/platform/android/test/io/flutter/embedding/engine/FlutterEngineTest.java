@@ -1,7 +1,8 @@
-package io.flutter.embedding.engine;
+package test.io.flutter.embedding.engine;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
@@ -15,6 +16,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Configuration;
@@ -23,10 +25,14 @@ import android.os.LocaleList;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import io.flutter.FlutterInjector;
+import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener;
+import io.flutter.embedding.engine.FlutterEngineGroup;
+import io.flutter.embedding.engine.FlutterJNI;
 import io.flutter.embedding.engine.loader.FlutterLoader;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.PluginRegistry;
+import io.flutter.plugin.platform.PlatformViewsController;
 import io.flutter.plugins.GeneratedPluginRegistrant;
 import java.util.List;
 import org.junit.After;
@@ -96,6 +102,21 @@ public class FlutterEngineTest {
   }
 
   @Test
+  public void itUpdatesDisplayMetricsOnConstructionWithActivityContext() {
+    // Needs an activity. ApplicationContext won't work for this.
+    ActivityController<Activity> activityController = Robolectric.buildActivity(Activity.class);
+    FlutterJNI mockFlutterJNI = mock(FlutterJNI.class);
+    when(mockFlutterJNI.isAttached()).thenReturn(true);
+
+    FlutterLoader mockFlutterLoader = mock(FlutterLoader.class);
+    FlutterEngine flutterEngine =
+        new FlutterEngine(activityController.get(), mockFlutterLoader, mockFlutterJNI);
+
+    verify(mockFlutterJNI, times(1))
+        .updateDisplayMetrics(eq(0), any(Float.class), any(Float.class), any(Float.class));
+  }
+
+  @Test
   public void itSendLocalesOnEngineInit() {
     FlutterJNI mockFlutterJNI = mock(FlutterJNI.class);
     when(mockFlutterJNI.isAttached()).thenReturn(true);
@@ -120,10 +141,10 @@ public class FlutterEngineTest {
     assertEquals(flutterEngine1, FlutterEngine.engineForId(1));
     assertEquals(flutterEngine2, FlutterEngine.engineForId(2));
     flutterEngine1.destroy();
-    assertEquals(null, FlutterEngine.engineForId(1));
+    assertNull(FlutterEngine.engineForId(1));
     assertEquals(flutterEngine2, FlutterEngine.engineForId(2));
     flutterEngine2.destroy();
-    assertEquals(null, FlutterEngine.engineForId(2));
+    assertNull(FlutterEngine.engineForId(2));
   }
 
   // Helps show the root cause of MissingPluginException type errors like
@@ -180,6 +201,59 @@ public class FlutterEngineTest {
 
     List<FlutterEngine> registeredEngines = GeneratedPluginRegistrant.getRegisteredEngines();
     assertTrue(registeredEngines.isEmpty());
+  }
+
+  @Test
+  public void itNotifiesPlatformViewsControllerWhenDevHotRestart() {
+    // Setup test.
+    FlutterJNI mockFlutterJNI = mock(FlutterJNI.class);
+    when(mockFlutterJNI.isAttached()).thenReturn(true);
+
+    PlatformViewsController platformViewsController = mock(PlatformViewsController.class);
+
+    ArgumentCaptor<FlutterEngine.EngineLifecycleListener> engineLifecycleListenerArgumentCaptor =
+        ArgumentCaptor.forClass(FlutterEngine.EngineLifecycleListener.class);
+
+    // Execute behavior under test.
+    new FlutterEngine(
+        ctx,
+        mock(FlutterLoader.class),
+        mockFlutterJNI,
+        platformViewsController,
+        /*dartVmArgs=*/ new String[] {},
+        /*automaticallyRegisterPlugins=*/ false);
+
+    // Obtain the EngineLifecycleListener within FlutterEngine that was given to FlutterJNI.
+    verify(mockFlutterJNI)
+        .addEngineLifecycleListener(engineLifecycleListenerArgumentCaptor.capture());
+    FlutterEngine.EngineLifecycleListener engineLifecycleListener =
+        engineLifecycleListenerArgumentCaptor.getValue();
+    assertNotNull(engineLifecycleListener);
+
+    // Simulate a pre-engine restart, AKA hot restart.
+    engineLifecycleListener.onPreEngineRestart();
+
+    // Verify that FlutterEngine notified PlatformViewsController of the pre-engine restart,
+    // AKA hot restart.
+    verify(platformViewsController, times(1)).onPreEngineRestart();
+  }
+
+  @Test
+  public void itNotifiesPlatformViewsControllerAboutJNILifecycle() {
+    PlatformViewsController platformViewsController = mock(PlatformViewsController.class);
+
+    // Execute behavior under test.
+    FlutterEngine engine =
+        new FlutterEngine(
+            ctx,
+            mock(FlutterLoader.class),
+            flutterJNI,
+            platformViewsController,
+            /*dartVmArgs=*/ new String[] {},
+            /*automaticallyRegisterPlugins=*/ false);
+
+    engine.destroy();
+    verify(platformViewsController, times(1)).onDetachedFromJNI();
   }
 
   @Test
@@ -301,6 +375,7 @@ public class FlutterEngineTest {
             mockContext,
             mock(FlutterLoader.class),
             flutterJNI,
+            new PlatformViewsController(),
             /*dartVmArgs=*/ new String[] {},
             /*automaticallyRegisterPlugins=*/ false,
             /*waitForRestorationData=*/ false,

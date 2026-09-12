@@ -88,8 +88,9 @@ List<Replacer> generatePartsPatterns(String libraryName, bool isPublic) {
     AllReplacer(RegExp(r'\n@JS(.*)\nlibrary .+;'), ''),
     // Remove library directives.
     AllReplacer(RegExp(r'\nlibrary .+;'), ''),
-    // Remove imports/exports from all part files.
-    AllReplacer(RegExp(r"\nimport '.+'\n\s*if \(dart\.library\..*\) '.*';"), ''),
+    // Remove imports/exports from all part files. Handles only `//` comments
+    // before the conditional import.
+    AllReplacer(RegExp(r"\nimport '.+'\n(\s*\/\/.*\n)?\s*if \(dart\.library\..*\) '.*';"), ''),
     AllReplacer(RegExp(r'\nimport\s*.*'), ''),
     AllReplacer(RegExp(r'\nexport\s*.*'), ''),
     AllReplacer(RegExp(r'\n@DefaultAsset(.*)'), ''),
@@ -108,8 +109,12 @@ final List<Replacer> stripMetaPatterns = <Replacer>[
 const Set<String> rootLibraryNames = <String>{'ui_web', 'engine', 'skwasm_stub', 'skwasm_impl'};
 
 final Map<Pattern, String> extraImportsMap = <Pattern, String>{
+  RegExp('skwasm_(stub|impl)'):
+      "import 'dart:_skwasm_impl' if (dart.library.html) 'dart:_skwasm_stub';",
   'ui_web': "import 'dart:ui_web' as ui_web;",
   'engine': "import 'dart:_engine';",
+  'web_test_fonts': "import 'dart:_web_test_fonts';",
+  'web_locale_keymap': "import 'dart:_web_locale_keymap' as locale_keymap;",
 };
 
 // Rewrites the "package"-style web ui library into a dart:ui implementation.
@@ -205,6 +210,7 @@ List<String> getExtraImportsForLibrary(String libraryName) {
   }
   if (libraryName == 'skwasm_impl') {
     extraImports.add("import 'dart:_wasm';");
+    extraImports.add("import 'dart:_js_interop_wasm';");
   }
   return extraImports;
 }

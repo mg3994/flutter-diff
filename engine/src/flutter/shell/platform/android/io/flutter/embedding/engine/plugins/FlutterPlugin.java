@@ -11,6 +11,8 @@ import androidx.lifecycle.Lifecycle;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.embedding.engine.FlutterEngineGroup;
 import io.flutter.plugin.common.BinaryMessenger;
+import io.flutter.plugin.platform.PlatformViewRegistry;
+import io.flutter.view.TextureRegistry;
 
 /**
  * Interface to be implemented by all Flutter plugins.
@@ -51,7 +53,13 @@ import io.flutter.plugin.common.BinaryMessenger;
  * be retrieved through a {@link Context}. Developers can access the application context via {@link
  * FlutterPluginBinding#getApplicationContext()}.
  *
- * All plugins must respect the possibility that a
+ * <p>Some plugins may require access to the {@code Activity} that is displaying a Flutter
+ * experience, or may need to react to {@code Activity} lifecycle events, e.g., {@code onCreate()},
+ * {@code onStart()}, {@code onResume()}, {@code onPause()}, {@code onStop()}, {@code onDestroy()}.
+ * Any such plugin should implement {@link
+ * io.flutter.embedding.engine.plugins.activity.ActivityAware} in addition to implementing {@code
+ * FlutterPlugin}. {@code ActivityAware} provides callback hooks that expose access to an associated
+ * {@code Activity} and its {@code Lifecycle}. All plugins must respect the possibility that a
  * Flutter experience may never be associated with an {@code Activity}, e.g., when Flutter is used
  * for background behavior. Additionally, all plugins must respect that a {@code Activity}s may come
  * and go over time, thus requiring plugins to cleanup resources and recreate those resources as the
@@ -89,7 +97,8 @@ public interface FlutterPlugin {
    * <p>The provided {@link BinaryMessenger} can be used to communicate with Dart code running in
    * the Flutter context associated with this plugin binding.
    *
-   * <p>Plugins that need to respond to {@code Lifecycle} events should {@link
+   * <p>Plugins that need to respond to {@code Lifecycle} events should implement the additional
+   * {@link io.flutter.embedding.engine.plugins.activity.ActivityAware} and/or {@link
    * io.flutter.embedding.engine.plugins.service.ServiceAware} interfaces, where a {@link Lifecycle}
    * reference can be obtained.
    */
@@ -97,6 +106,8 @@ public interface FlutterPlugin {
     private final Context applicationContext;
     private final FlutterEngine flutterEngine;
     private final BinaryMessenger binaryMessenger;
+    private final TextureRegistry textureRegistry;
+    private final PlatformViewRegistry platformViewRegistry;
     private final FlutterAssets flutterAssets;
     private final FlutterEngineGroup group;
 
@@ -104,11 +115,15 @@ public interface FlutterPlugin {
         @NonNull Context applicationContext,
         @NonNull FlutterEngine flutterEngine,
         @NonNull BinaryMessenger binaryMessenger,
+        @NonNull TextureRegistry textureRegistry,
+        @NonNull PlatformViewRegistry platformViewRegistry,
         @NonNull FlutterAssets flutterAssets,
         @Nullable FlutterEngineGroup group) {
       this.applicationContext = applicationContext;
       this.flutterEngine = flutterEngine;
       this.binaryMessenger = binaryMessenger;
+      this.textureRegistry = textureRegistry;
+      this.platformViewRegistry = platformViewRegistry;
       this.flutterAssets = flutterAssets;
       this.group = group;
     }
@@ -134,8 +149,31 @@ public interface FlutterPlugin {
     }
 
     @NonNull
+    public TextureRegistry getTextureRegistry() {
+      return textureRegistry;
+    }
+
+    @NonNull
+    public PlatformViewRegistry getPlatformViewRegistry() {
+      return platformViewRegistry;
+    }
+
+    @NonNull
     public FlutterAssets getFlutterAssets() {
       return flutterAssets;
+    }
+
+    /**
+     * Get a {@link FlutterPlugin} that has been registered to the same {@link FlutterEngine} as
+     * this binding.
+     *
+     * @param pluginClass The type of plugin.
+     * @return The instance of the requested plugin type, or null if no plugin of that type has been
+     *     registered
+     */
+    @Nullable
+    public FlutterPlugin getPlugin(@NonNull Class<? extends FlutterPlugin> pluginClass) {
+      return flutterEngine.getPlugins().get(pluginClass);
     }
 
     /**

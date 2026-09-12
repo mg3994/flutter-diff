@@ -11,6 +11,8 @@
     kFlutter*;
     kDartSnapshotData;
     kDartSnapshotText;
+    InternalFlutterGpu*;
+    kInternalFlutterGpu*;
   local:
     *;
 };

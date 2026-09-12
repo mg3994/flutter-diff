@@ -422,7 +422,64 @@ void main() {
       expect(sizedBoxes[1].offset, equals(const Offset(160.0, 0.0)));
       expect(sizedBoxes[2].offset.dy > 0.0, isTrue);
     });
+
+    test('MediaQuery resolution and landscape orientation detection', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const MediaQuery(
+          data: MediaQueryData(size: Size(1024, 768), devicePixelRatio: 2.0),
+          child: _OrientationTextWidget(),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('landscape'));
+    });
+
+    test('CustomPaint vector command generation', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: CustomPaint(
+          painter: _TestPainter(),
+          size: const Size(100, 100),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final customPaintView = backend.views.values.firstWhere((v) => v.widgetType == 'CustomPaint');
+      final List<dynamic> commands = customPaintView.props['commands'] as List<dynamic>;
+
+      expect(commands.isNotEmpty, isTrue);
+      expect(commands.first['type'], equals('drawRect'));
+    });
   });
+}
+
+class _OrientationTextWidget extends StatelessWidget {
+  const _OrientationTextWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return Text(media.orientation.name);
+  }
+}
+
+class _TestPainter extends CustomPainter {
+  @override
+  void paint(NativeCanvas canvas, Size size) {
+    canvas.drawRect(Offset.zero, size, '#000000');
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
 
 class _ThemeConsumerWidget extends StatelessWidget {

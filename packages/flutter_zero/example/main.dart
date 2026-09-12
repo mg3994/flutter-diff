@@ -1,12 +1,23 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
-final GlobalKey<FormState> formGlobalKey = GlobalKey<FormState>();
+class SamplePainter extends CustomPainter {
+  @override
+  void paint(NativeCanvas canvas, Size size) {
+    canvas.drawRect(Offset.zero, size, '#E0E0E0');
+    canvas.drawCircle(Offset(size.width / 2, size.height / 2), 20.0, '#FF0000');
+    canvas.drawLine(Offset.zero, Offset(size.width, size.height), '#0066CC', 2.0);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
     final theme = Theme.of(context);
 
     return Container(
@@ -16,49 +27,16 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              'Flutter Zero Framework with GlobalKey & Image Support',
+              'Flutter Zero Screen (${media.orientation.name.toUpperCase()} mode)',
               fontSize: theme.defaultFontSize + 4.0,
               color: theme.textColor,
             ),
             const SizedBox(height: 15.0),
-            Image.network(
-              'https://flutter.dev/logo.png',
-              width: 120.0,
-              height: 40.0,
-            ),
+            Text('Device Pixel Ratio: ${media.devicePixelRatio}'),
             const SizedBox(height: 15.0),
-            const Wrap(
-              spacing: 10.0,
-              children: [
-                Chip(label: Text('Dart FFI')),
-                Chip(label: Text('Native Platform UI')),
-                Chip(label: Text('No Canvas')),
-              ],
-            ),
-            const SizedBox(height: 15.0),
-            Form(
-              key: formGlobalKey,
-              child: Column(
-                children: [
-                  TextFormField(
-                    placeholder: 'Enter profile name...',
-                    validator: (val) {
-                      if (val == null || val.isEmpty) return 'Name is required';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10.0),
-                  Button(
-                    onPressed: () {
-                      final form = formGlobalKey.currentState;
-                      if (form != null && form.validate()) {
-                        print('Form is valid!');
-                      }
-                    },
-                    child: const Text('Validate Form via GlobalKey'),
-                  ),
-                ],
-              ),
+            CustomPaint(
+              painter: SamplePainter(),
+              size: const Size(200.0, 100.0),
             ),
           ],
         ),
@@ -70,21 +48,20 @@ class HomeScreen extends StatelessWidget {
 void main() {
   final backend = VirtualNativeUIBackend();
 
-  const themeData = ThemeData(
-    primaryColor: '#0066CC',
-    backgroundColor: '#FAFAFA',
-    textColor: '#222222',
+  const mediaData = MediaQueryData(
+    size: Size(1024.0, 768.0),
+    devicePixelRatio: 2.0,
   );
 
   final app = FlutterZeroApp(
-    rootWidget: const Theme(
-      data: themeData,
+    rootWidget: const MediaQuery(
+      data: mediaData,
       child: HomeScreen(),
     ),
     backend: backend,
   );
 
-  print('=== Initializing Flutter Zero App with Image, Wrap & GlobalKey ===');
+  print('=== Initializing Flutter Zero App with MediaQuery & CustomPaint ===');
   app.run();
 
   print('\n=== Native View Tree on Mount ===');

@@ -734,8 +734,13 @@ class RowElement extends NativeRenderElement {
     }
 
     _childElements = newChildElements;
-    for (final el in _childElements) {
+    for (int i = 0; i < _childElements.length; i++) {
+      final el = _childElements[i];
+      final w = newChildrenWidgets[i];
       if (el.renderNode != null) {
+        if (w is Flexible) {
+          el.renderNode!.props['flex'] = w.flex;
+        }
         multiNode.addChild(el.renderNode!);
       }
     }

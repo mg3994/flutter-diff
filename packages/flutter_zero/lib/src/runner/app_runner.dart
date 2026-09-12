@@ -40,7 +40,8 @@ class FlutterZeroApp {
   }
 
   void _syncNativeTree(NativeRenderNode node, int? parentHandle) {
-    if (node.nativeHandle == null) {
+    final isNew = node.nativeHandle == null;
+    if (isNew) {
       node.nativeHandle = backend.createView(node.widgetType, node.props);
     } else {
       backend.updateView(node.nativeHandle!, node.props);
@@ -50,6 +51,10 @@ class FlutterZeroApp {
 
     if (parentHandle != null) {
       backend.appendChild(parentHandle, node.nativeHandle!);
+    }
+
+    if (isNew && node.onNativeHandleCreated != null) {
+      node.onNativeHandleCreated!(node.nativeHandle!);
     }
 
     for (final child in node.children) {

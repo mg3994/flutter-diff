@@ -7,4 +7,6 @@ export 'src/core/element.dart';
 export 'src/core/render_node.dart';
 export 'src/core/widget.dart';
 export 'src/runner/app_runner.dart';
+export 'src/widgets/gestures.dart';
+export 'src/widgets/theme.dart';
 export 'src/widgets/widgets.dart';

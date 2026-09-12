@@ -125,7 +125,112 @@ void main() {
       expect(eventFired, isTrue);
       expect(eventData, equals({'x': 10, 'y': 20}));
     });
+
+    test('InheritedWidget Theme propagation to child widgets', () {
+      final backend = VirtualNativeUIBackend();
+      const customTheme = ThemeData(
+        primaryColor: '#FF0000',
+        backgroundColor: '#000000',
+      );
+
+      final app = FlutterZeroApp(
+        rootWidget: const Theme(
+          data: customTheme,
+          child: _ThemeConsumerWidget(),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['color'], equals('#FF0000'));
+    });
+
+    test('GestureDetector native event handling', () {
+      final backend = VirtualNativeUIBackend();
+      bool tapped = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: GestureDetector(
+          onTap: () {
+            tapped = true;
+          },
+          child: const Text('Tap Me'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final gestureView = backend.views.values.firstWhere((v) => v.widgetType == 'GestureDetector');
+      backend.dispatchNativeEvent(gestureView.handle, 'tap', {});
+
+      expect(tapped, isTrue);
+    });
+
+    test('Stack and Positioned layout calculation', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Stack(
+          children: [
+            Container(width: 200, height: 200),
+            Positioned(
+              top: 15.0,
+              left: 25.0,
+              child: Container(width: 50, height: 50),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final stackView = backend.views.values.firstWhere((v) => v.widgetType == 'Stack');
+      final positionedView = backend.views.values.where((v) => v.widgetType == 'Container').last;
+
+      expect(stackView.size, equals(const Size(200.0, 200.0)));
+      expect(positionedView.offset, equals(const Offset(25.0, 15.0)));
+    });
+
+    test('ListView item extent layout calculation', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const ListView(
+          itemExtent: 30.0,
+          children: [
+            Text('Item 1'),
+            Text('Item 2'),
+            Text('Item 3'),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final listView = backend.views.values.firstWhere((v) => v.widgetType == 'ListView');
+      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
+
+      expect(listView.size.height, equals(90.0));
+      expect(textViews[0].offset, equals(const Offset(0.0, 0.0)));
+      expect(textViews[1].offset, equals(const Offset(0.0, 30.0)));
+      expect(textViews[2].offset, equals(const Offset(0.0, 60.0)));
+    });
   });
+}
+
+class _ThemeConsumerWidget extends StatelessWidget {
+  const _ThemeConsumerWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text('Themed Text', color: theme.primaryColor);
+  }
 }
 
 class _TestStatefulWidget extends StatefulWidget {

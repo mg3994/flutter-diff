@@ -63,6 +63,7 @@ abstract class NativeRenderNode {
   int? nativeHandle;
   String widgetType;
   Map<String, dynamic> props;
+  void Function(int handle)? onNativeHandleCreated;
 
   Offset offset = Offset.zero;
   Size size = Size.zero;

@@ -89,6 +89,16 @@ abstract class State<T extends StatefulWidget> {
   }
 }
 
+abstract class InheritedWidget extends Widget {
+  final Widget child;
+  const InheritedWidget({super.key, required this.child});
+
+  @override
+  Element createElement() => InheritedElement(this);
+
+  bool updateShouldNotify(covariant InheritedWidget oldWidget);
+}
+
 abstract class SingleChildRenderObjectWidget extends Widget {
   final Widget? child;
   const SingleChildRenderObjectWidget({super.key, this.child});

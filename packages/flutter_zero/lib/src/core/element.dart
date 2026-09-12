@@ -5,6 +5,7 @@ import 'widget.dart';
 abstract class BuildContext {
   Widget get widget;
   bool get mounted;
+  T? dependOnInheritedWidgetOfExactType<T extends InheritedWidget>();
 }
 
 abstract class Element implements BuildContext {
@@ -15,6 +16,7 @@ abstract class Element implements BuildContext {
   Element? parent;
   NativeRenderNode? renderNode;
   FlutterZeroApp? owner;
+  Map<Type, InheritedElement>? _inheritedElements;
 
   Element(this._widget);
 
@@ -24,8 +26,19 @@ abstract class Element implements BuildContext {
   bool get mounted => parent != null || _isRoot;
   bool _isRoot = false;
 
+  @override
+  T? dependOnInheritedWidgetOfExactType<T extends InheritedWidget>() {
+    final ancestor = _inheritedElements?[T];
+    if (ancestor != null) {
+      ancestor._dependents.add(this);
+      return ancestor.widget as T;
+    }
+    return null;
+  }
+
   void mount(Element? parent) {
     this.parent = parent;
+    _inheritedElements = parent?._inheritedElements;
   }
 
   void update(Widget newWidget);
@@ -48,6 +61,10 @@ abstract class ComponentElement extends Element {
   @override
   void mount(Element? parent) {
     super.mount(parent);
+    performBuild();
+  }
+
+  void performBuild() {
     rebuild();
   }
 
@@ -86,6 +103,38 @@ abstract class ComponentElement extends Element {
   }
 
   Widget build();
+}
+
+class InheritedElement extends ComponentElement {
+  final Set<Element> _dependents = {};
+
+  InheritedElement(InheritedWidget super.widget);
+
+  @override
+  InheritedWidget get widget => super.widget as InheritedWidget;
+
+  @override
+  void mount(Element? parent) {
+    this.parent = parent;
+    final Map<Type, InheritedElement> inherited = Map.from(parent?._inheritedElements ?? {});
+    inherited[widget.runtimeType] = this;
+    _inheritedElements = inherited;
+    performBuild();
+  }
+
+  @override
+  void update(Widget newWidget) {
+    final oldWidget = widget;
+    super.update(newWidget);
+    if (widget.updateShouldNotify(oldWidget)) {
+      for (final dependent in _dependents) {
+        dependent.rebuild();
+      }
+    }
+  }
+
+  @override
+  Widget build() => widget.child;
 }
 
 class StatelessElement extends ComponentElement {

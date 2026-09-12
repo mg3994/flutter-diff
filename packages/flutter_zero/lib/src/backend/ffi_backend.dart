@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import '../core/render_node.dart';
@@ -45,7 +46,7 @@ class FFINativeUIBackend implements NativeUIBackend {
   int createView(String widgetType, Map<String, dynamic> props) {
     if (_createViewFn != null) {
       final typePtr = widgetType.toNativeUtf8();
-      final propsPtr = props.toString().toNativeUtf8();
+      final propsPtr = jsonEncode(props).toNativeUtf8();
       final handle = _createViewFn!(typePtr, propsPtr);
       calloc.free(typePtr);
       calloc.free(propsPtr);
@@ -57,7 +58,7 @@ class FFINativeUIBackend implements NativeUIBackend {
   @override
   void updateView(int handle, Map<String, dynamic> props) {
     if (_updateViewFn != null) {
-      final propsPtr = props.toString().toNativeUtf8();
+      final propsPtr = jsonEncode(props).toNativeUtf8();
       _updateViewFn!(handle, propsPtr);
       calloc.free(propsPtr);
     }

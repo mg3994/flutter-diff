@@ -8,6 +8,7 @@ class FlutterZeroApp {
   final NativeUIBackend backend;
 
   RootElement? _rootElement;
+  BoxConstraints _lastConstraints = const BoxConstraints(maxWidth: 800.0, maxHeight: 600.0);
 
   FlutterZeroApp({
     required this.rootWidget,
@@ -15,23 +16,25 @@ class FlutterZeroApp {
   });
 
   void run({BoxConstraints constraints = const BoxConstraints(maxWidth: 800.0, maxHeight: 600.0)}) {
+    _lastConstraints = constraints;
     _rootElement = RootElement(rootWidget);
+    _rootElement!.owner = this;
     _rootElement!.mountRoot();
 
-    final rootRenderNode = _rootElement!.renderNode;
-    if (rootRenderNode != null) {
-      rootRenderNode.performLayout(constraints);
-      _syncNativeTree(rootRenderNode, null);
-    }
+    scheduleFrame();
   }
 
-  void update(Widget newWidget, {BoxConstraints constraints = const BoxConstraints(maxWidth: 800.0, maxHeight: 600.0)}) {
+  void update(Widget newWidget, {BoxConstraints? constraints}) {
     if (_rootElement == null) return;
+    if (constraints != null) _lastConstraints = constraints;
     _rootElement!.updateRoot(newWidget);
+    scheduleFrame();
+  }
 
-    final rootRenderNode = _rootElement!.renderNode;
+  void scheduleFrame() {
+    final rootRenderNode = _rootElement?.renderNode;
     if (rootRenderNode != null) {
-      rootRenderNode.performLayout(constraints);
+      rootRenderNode.performLayout(_lastConstraints);
       _syncNativeTree(rootRenderNode, null);
     }
   }

@@ -65,23 +65,22 @@ void main() {
       expect(textView.props['text'], equals('Updated Text'));
     });
 
-    test('StatefulWidget state management & state updates', () {
+    test('StatefulWidget state management & automatic native UI update', () {
       final backend = VirtualNativeUIBackend();
 
       late void Function() triggerIncrement;
 
-      Widget buildApp() {
-        return _TestStatefulWidget(onRegister: (cb) => triggerIncrement = cb);
-      }
-
-      final app = FlutterZeroApp(rootWidget: buildApp(), backend: backend);
+      final app = FlutterZeroApp(
+        rootWidget: _TestStatefulWidget(onRegister: (cb) => triggerIncrement = cb),
+        backend: backend,
+      );
       app.run();
 
       var textViews = backend.views.values.where((v) => v.widgetType == 'Text');
       expect(textViews.first.props['text'], equals('Count: 0'));
 
+      // setState automatically schedules frame update on the native backend
       triggerIncrement();
-      app.update(buildApp());
 
       textViews = backend.views.values.where((v) => v.widgetType == 'Text');
       expect(textViews.first.props['text'], equals('Count: 1'));

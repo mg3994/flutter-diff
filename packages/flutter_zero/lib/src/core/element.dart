@@ -1,3 +1,4 @@
+import '../runner/app_runner.dart';
 import 'render_node.dart';
 import 'widget.dart';
 
@@ -13,8 +14,11 @@ abstract class Element implements BuildContext {
 
   Element? parent;
   NativeRenderNode? renderNode;
+  FlutterZeroApp? owner;
 
   Element(this._widget);
+
+  FlutterZeroApp? get appOwner => owner ?? parent?.appOwner;
 
   @override
   bool get mounted => parent != null || _isRoot;
@@ -123,6 +127,7 @@ class StatefulElement extends ComponentElement {
 
   void markNeedsBuild() {
     rebuild();
+    appOwner?.scheduleFrame();
   }
 
   @override

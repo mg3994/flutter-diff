@@ -618,20 +618,47 @@ class RowElement extends NativeRenderElement {
     super.update(newWidget);
     final newRow = newWidget as Row;
     final multiNode = renderNode as MultiChildNativeRenderNode;
+    final newChildrenWidgets = newRow.children;
 
-    for (final el in _childElements) {
-      el.unmount();
-    }
+    final List<Element> newChildElements = [];
     multiNode.children.clear();
 
-    _childElements = newRow.children.map((w) {
-      final el = w.createElement();
-      el.mount(this);
+    final int minLength = _childElements.length < newChildrenWidgets.length
+        ? _childElements.length
+        : newChildrenWidgets.length;
+
+    for (int i = 0; i < minLength; i++) {
+      final oldEl = _childElements[i];
+      final newW = newChildrenWidgets[i];
+      if (Widget.canUpdate(oldEl.widget, newW)) {
+        oldEl.update(newW);
+        newChildElements.add(oldEl);
+      } else {
+        oldEl.unmount();
+        final newEl = newW.createElement();
+        newEl.mount(this);
+        newChildElements.add(newEl);
+      }
+    }
+
+    if (_childElements.length > newChildrenWidgets.length) {
+      for (int i = minLength; i < _childElements.length; i++) {
+        _childElements[i].unmount();
+      }
+    } else if (newChildrenWidgets.length > _childElements.length) {
+      for (int i = minLength; i < newChildrenWidgets.length; i++) {
+        final newEl = newChildrenWidgets[i].createElement();
+        newEl.mount(this);
+        newChildElements.add(newEl);
+      }
+    }
+
+    _childElements = newChildElements;
+    for (final el in _childElements) {
       if (el.renderNode != null) {
         multiNode.addChild(el.renderNode!);
       }
-      return el;
-    }).toList();
+    }
   }
 
   @override
@@ -696,20 +723,47 @@ class ColumnElement extends NativeRenderElement {
     super.update(newWidget);
     final newColumn = newWidget as Column;
     final multiNode = renderNode as MultiChildNativeRenderNode;
+    final newChildrenWidgets = newColumn.children;
 
-    for (final el in _childElements) {
-      el.unmount();
-    }
+    final List<Element> newChildElements = [];
     multiNode.children.clear();
 
-    _childElements = newColumn.children.map((w) {
-      final el = w.createElement();
-      el.mount(this);
+    final int minLength = _childElements.length < newChildrenWidgets.length
+        ? _childElements.length
+        : newChildrenWidgets.length;
+
+    for (int i = 0; i < minLength; i++) {
+      final oldEl = _childElements[i];
+      final newW = newChildrenWidgets[i];
+      if (Widget.canUpdate(oldEl.widget, newW)) {
+        oldEl.update(newW);
+        newChildElements.add(oldEl);
+      } else {
+        oldEl.unmount();
+        final newEl = newW.createElement();
+        newEl.mount(this);
+        newChildElements.add(newEl);
+      }
+    }
+
+    if (_childElements.length > newChildrenWidgets.length) {
+      for (int i = minLength; i < _childElements.length; i++) {
+        _childElements[i].unmount();
+      }
+    } else if (newChildrenWidgets.length > _childElements.length) {
+      for (int i = minLength; i < newChildrenWidgets.length; i++) {
+        final newEl = newChildrenWidgets[i].createElement();
+        newEl.mount(this);
+        newChildElements.add(newEl);
+      }
+    }
+
+    _childElements = newChildElements;
+    for (final el in _childElements) {
       if (el.renderNode != null) {
         multiNode.addChild(el.renderNode!);
       }
-      return el;
-    }).toList();
+    }
   }
 
   @override

@@ -22,6 +22,24 @@ class ValueKey<T> extends Key {
   String toString() => '[$value]';
 }
 
+class GlobalKey<T extends State<StatefulWidget>> extends Key {
+  static final Map<GlobalKey<dynamic>, StatefulElement> _registry = {};
+
+  const GlobalKey() : super._();
+
+  T? get currentState => _registry[this]?.state as T?;
+  BuildContext? get currentContext => _registry[this];
+  Widget? get currentWidget => _registry[this]?.widget;
+
+  static void register(GlobalKey<dynamic> key, StatefulElement element) {
+    _registry[key] = element;
+  }
+
+  static void unregister(GlobalKey<dynamic> key) {
+    _registry.remove(key);
+  }
+}
+
 abstract class Widget {
   final Key? key;
 

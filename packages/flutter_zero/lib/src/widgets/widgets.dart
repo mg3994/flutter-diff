@@ -26,6 +26,7 @@ class NativeRenderElement extends Element {
 
   @override
   void update(Widget newWidget) {
+    updateWidget(newWidget);
     if (renderNode != null && newWidget is NativeRenderWidget) {
       final newNode = newWidget.createRenderNode();
       renderNode!.updateProps(newNode.props);
@@ -1325,6 +1326,182 @@ class PlatformViewRenderNode extends NativeRenderNode {
       constraints.maxWidth.isFinite ? constraints.maxWidth : 300.0,
       constraints.maxHeight.isFinite ? constraints.maxHeight : 200.0,
     ));
+  }
+}
+
+class Chip extends StatelessWidget {
+  final Widget label;
+  final Widget? avatar;
+
+  const Chip({
+    super.key,
+    required this.label,
+    this.avatar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      backgroundColor: '#E0E0E0',
+      child: Padding(
+        padding: 6.0,
+        child: Row(
+          children: [
+            if (avatar != null) ...[
+              avatar!,
+              const SizedBox(width: 4.0),
+            ],
+            label,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class Wrap extends NativeRenderWidget {
+  final List<Widget> children;
+  final double spacing;
+  final double runSpacing;
+
+  const Wrap({
+    super.key,
+    this.children = const [],
+    this.spacing = 8.0,
+    this.runSpacing = 8.0,
+  });
+
+  @override
+  Element createElement() => WrapElement(this);
+
+  @override
+  NativeRenderNode createRenderNode() {
+    return WrapRenderNode(
+      props: {
+        'spacing': spacing,
+        'runSpacing': runSpacing,
+      },
+    );
+  }
+}
+
+class WrapRenderNode extends MultiChildNativeRenderNode {
+  WrapRenderNode({required super.props}) : super(widgetType: 'Wrap');
+
+  @override
+  void performLayout(BoxConstraints constraints) {
+    final double spacing = (props['spacing'] as num?)?.toDouble() ?? 8.0;
+    final double runSpacing = (props['runSpacing'] as num?)?.toDouble() ?? 8.0;
+    final double maxW = constraints.maxWidth.isFinite ? constraints.maxWidth : 800.0;
+
+    double currentX = 0.0;
+    double currentY = 0.0;
+    double lineMaxHeight = 0.0;
+    double totalWidth = 0.0;
+
+    for (final child in children) {
+      child.performLayout(constraints);
+
+      if (currentX + child.size.width > maxW && currentX > 0) {
+        currentX = 0.0;
+        currentY += lineMaxHeight + runSpacing;
+        lineMaxHeight = 0.0;
+      }
+
+      child.offset = Offset(currentX, currentY);
+      currentX += child.size.width + spacing;
+      if (child.size.height > lineMaxHeight) lineMaxHeight = child.size.height;
+      if (currentX > totalWidth) totalWidth = currentX;
+    }
+
+    size = constraints.constrain(Size(totalWidth, currentY + lineMaxHeight));
+  }
+}
+
+class WrapElement extends NativeRenderElement {
+  List<Element> _childElements = [];
+
+  WrapElement(Wrap super.widget);
+
+  @override
+  Wrap get widget => super.widget as Wrap;
+
+  @override
+  void mount(Element? parent) {
+    super.mount(parent);
+    final multiNode = renderNode as MultiChildNativeRenderNode;
+    _childElements = widget.children.map((w) {
+      final el = w.createElement();
+      el.mount(this);
+      if (el.renderNode != null) {
+        multiNode.addChild(el.renderNode!);
+      }
+      return el;
+    }).toList();
+  }
+
+  @override
+  void update(Widget newWidget) {
+    super.update(newWidget);
+    final newWrap = newWidget as Wrap;
+    final multiNode = renderNode as MultiChildNativeRenderNode;
+    final newChildrenWidgets = newWrap.children;
+
+    final List<Element> newChildElements = [];
+    multiNode.children.clear();
+
+    final int minLength = _childElements.length < newChildrenWidgets.length
+        ? _childElements.length
+        : newChildrenWidgets.length;
+
+    for (int i = 0; i < minLength; i++) {
+      final oldEl = _childElements[i];
+      final newW = newChildrenWidgets[i];
+      if (Widget.canUpdate(oldEl.widget, newW)) {
+        oldEl.update(newW);
+        newChildElements.add(oldEl);
+      } else {
+        oldEl.unmount();
+        final newEl = newW.createElement();
+        newEl.mount(this);
+        newChildElements.add(newEl);
+      }
+    }
+
+    if (_childElements.length > newChildrenWidgets.length) {
+      for (int i = minLength; i < _childElements.length; i++) {
+        _childElements[i].unmount();
+      }
+    } else if (newChildrenWidgets.length > _childElements.length) {
+      for (int i = minLength; i < newChildrenWidgets.length; i++) {
+        final newEl = newChildrenWidgets[i].createElement();
+        newEl.mount(this);
+        newChildElements.add(newEl);
+      }
+    }
+
+    _childElements = newChildElements;
+    for (final el in _childElements) {
+      if (el.renderNode != null) {
+        multiNode.addChild(el.renderNode!);
+      }
+    }
+  }
+
+  @override
+  void unmount() {
+    for (final el in _childElements) {
+      el.unmount();
+    }
+    _childElements.clear();
+    super.unmount();
+  }
+
+  @override
+  void visitChildren(void Function(Element element) visitor) {
+    for (final el in _childElements) {
+      visitor(el);
+    }
   }
 }
 

@@ -1,9 +1,6 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
-class AppState {
-  final String username;
-  const AppState(this.username);
-}
+final GlobalKey<FormState> formGlobalKey = GlobalKey<FormState>();
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -11,7 +8,6 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final formKey = Key('main_form');
 
     return Container(
       backgroundColor: theme.backgroundColor,
@@ -20,46 +16,46 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              'Flutter Zero Native Application Framework',
+              'Flutter Zero Framework with GlobalKey & Image Support',
               fontSize: theme.defaultFontSize + 4.0,
               color: theme.textColor,
             ),
             const SizedBox(height: 15.0),
-            Consumer<AppState>(
-              builder: (ctx, state, child) {
-                return Text('Injected User: ${state.username}', color: theme.primaryColor);
-              },
+            Image.network(
+              'https://flutter.dev/logo.png',
+              width: 120.0,
+              height: 40.0,
+            ),
+            const SizedBox(height: 15.0),
+            const Wrap(
+              spacing: 10.0,
+              children: [
+                Chip(label: Text('Dart FFI')),
+                Chip(label: Text('Native Platform UI')),
+                Chip(label: Text('No Canvas')),
+              ],
             ),
             const SizedBox(height: 15.0),
             Form(
-              key: formKey,
+              key: formGlobalKey,
               child: Column(
                 children: [
                   TextFormField(
-                    placeholder: 'Enter username...',
+                    placeholder: 'Enter profile name...',
                     validator: (val) {
-                      if (val == null || val.isEmpty) return 'Username cannot be empty';
+                      if (val == null || val.isEmpty) return 'Name is required';
                       return null;
                     },
                   ),
                   const SizedBox(height: 10.0),
                   Button(
                     onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (dialogCtx) => AlertDialog(
-                          title: const Text('Modal Dialog'),
-                          content: const Text('Native Flutter Zero Dialog Content'),
-                          actions: [
-                            Button(
-                              onPressed: () => Navigator.pop(dialogCtx),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                      );
+                      final form = formGlobalKey.currentState;
+                      if (form != null && form.validate()) {
+                        print('Form is valid!');
+                      }
                     },
-                    child: const Text('Show Native AlertDialog'),
+                    child: const Text('Validate Form via GlobalKey'),
                   ),
                 ],
               ),
@@ -81,33 +77,16 @@ void main() {
   );
 
   final app = FlutterZeroApp(
-    rootWidget: Provider<AppState>(
-      value: const AppState('jules_developer'),
-      child: Theme(
-        data: themeData,
-        child: Navigator(
-          initialRoutes: [
-            PageRoute(builder: (ctx) => const HomeScreen()),
-          ],
-        ),
-      ),
+    rootWidget: const Theme(
+      data: themeData,
+      child: HomeScreen(),
     ),
     backend: backend,
   );
 
-  print('=== Initializing Flutter Zero App with Form, Provider & Dialog ===');
+  print('=== Initializing Flutter Zero App with Image, Wrap & GlobalKey ===');
   app.run();
 
   print('\n=== Native View Tree on Mount ===');
-  print(backend.printTree());
-
-  final buttonViews = backend.views.values.where((v) => v.widgetType == 'Button').toList();
-  if (buttonViews.isNotEmpty) {
-    final dialogButton = buttonViews.first;
-    print('\n>>> Simulating click on "Show AlertDialog" Button #${dialogButton.handle}...');
-    backend.dispatchNativeEvent(dialogButton.handle, 'click', {});
-  }
-
-  print('\n=== Native View Tree After AlertDialog Overlay ===');
   print(backend.printTree());
 }

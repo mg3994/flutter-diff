@@ -13,6 +13,10 @@ abstract class Element implements BuildContext {
   @override
   Widget get widget => _widget;
 
+  void updateWidget(Widget newWidget) {
+    _widget = newWidget;
+  }
+
   Element? parent;
   NativeRenderNode? renderNode;
   FlutterZeroApp? owner;
@@ -164,12 +168,16 @@ class StatefulElement extends ComponentElement {
   void mount(Element? parent) {
     this.parent = parent;
     _inheritedElements = parent?._inheritedElements;
+    if (widget.key is GlobalKey) {
+      GlobalKey.register(widget.key! as GlobalKey, this);
+    }
     _state.initState();
     performBuild();
   }
 
   @override
   void update(Widget newWidget) {
+    _widget = newWidget;
     final StatefulWidget oldWidget = widget;
     _state.updateWidget(newWidget as StatefulWidget);
     _state.didUpdateWidget(oldWidget);
@@ -183,6 +191,9 @@ class StatefulElement extends ComponentElement {
 
   @override
   void unmount() {
+    if (widget.key is GlobalKey) {
+      GlobalKey.unregister(widget.key! as GlobalKey);
+    }
     _state.dispose();
     _state.detachElement();
     super.unmount();

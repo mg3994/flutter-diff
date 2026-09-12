@@ -360,6 +360,68 @@ void main() {
       expect(textViews[0].props['text'], equals('Test Dialog Title'));
       expect(textViews[1].props['text'], equals('Test Dialog Content'));
     });
+
+    test('GlobalKey element lookup and state registration', () {
+      final backend = VirtualNativeUIBackend();
+      final key = GlobalKey<_TestStatefulWidgetState>();
+
+      final app = FlutterZeroApp(
+        rootWidget: _TestStatefulWidget(
+          key: key,
+          onRegister: (_) {},
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      expect(key.currentState, isNotNull);
+      expect(key.currentContext, isNotNull);
+    });
+
+    test('Image render node network and asset properties', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            Image.network('https://example.com/logo.png', width: 100, height: 50),
+            Image.asset('assets/icon.png', width: 50, height: 50),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final imageViews = backend.views.values.where((v) => v.widgetType == 'Image').toList();
+      expect(imageViews[0].props['src'], equals('https://example.com/logo.png'));
+      expect(imageViews[1].props['src'], equals('asset://assets/icon.png'));
+    });
+
+    test('Wrap layout line wrapping calculation', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Wrap(
+          spacing: 10.0,
+          children: [
+            SizedBox(width: 150, height: 30),
+            SizedBox(width: 150, height: 30),
+            SizedBox(width: 150, height: 30),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run(constraints: const BoxConstraints(maxWidth: 320.0, maxHeight: 600.0));
+
+      final sizedBoxes = backend.views.values.where((v) => v.widgetType == 'SizedBox').toList();
+
+      expect(sizedBoxes[0].offset, equals(const Offset(0.0, 0.0)));
+      expect(sizedBoxes[1].offset, equals(const Offset(160.0, 0.0)));
+      expect(sizedBoxes[2].offset.dy > 0.0, isTrue);
+    });
   });
 }
 
@@ -375,7 +437,7 @@ class _ThemeConsumerWidget extends StatelessWidget {
 
 class _TestStatefulWidget extends StatefulWidget {
   final void Function(void Function()) onRegister;
-  const _TestStatefulWidget({required this.onRegister});
+  const _TestStatefulWidget({super.key, required this.onRegister});
 
   @override
   State<_TestStatefulWidget> createState() => _TestStatefulWidgetState();

@@ -2,6 +2,7 @@ library flutter_zero;
 
 export 'src/animation/animation.dart';
 export 'src/widgets/async.dart';
+export 'src/widgets/image.dart';
 export 'src/widgets/form.dart';
 export 'src/navigation/dialog.dart';
 export 'src/navigation/navigator.dart';

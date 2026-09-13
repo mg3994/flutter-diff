@@ -612,6 +612,52 @@ void main() {
       expect(semanticsView.props['label'], equals('Accessibility Button'));
       expect(semanticsView.props['hint'], equals('Double tap to activate'));
     });
+
+    test('GridView column layout and item offset calculation', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const GridView(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10.0,
+          mainAxisSpacing: 10.0,
+          children: [
+            Text('Item 1'),
+            Text('Item 2'),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run(constraints: const BoxConstraints(maxWidth: 210.0, maxHeight: 600.0));
+
+      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
+      expect(textViews[0].offset, equals(const Offset(0.0, 0.0)));
+      expect(textViews[1].offset, equals(const Offset(110.0, 0.0)));
+    });
+
+    test('CustomScrollView and SliverList layout pass', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const CustomScrollView(
+          slivers: [
+            SliverList(
+              children: [
+                Text('Sliver 1'),
+                Text('Sliver 2'),
+              ],
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final sliverView = backend.views.values.firstWhere((v) => v.widgetType == 'SliverList');
+      expect(sliverView, isNotNull);
+    });
   });
 }
 

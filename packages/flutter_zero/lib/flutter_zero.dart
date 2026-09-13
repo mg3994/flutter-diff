@@ -1,6 +1,7 @@
 library flutter_zero;
 
 export 'src/accessibility/semantics.dart';
+export 'src/animation/animated_container.dart';
 export 'src/animation/animation.dart';
 export 'src/focus/focus.dart';
 export 'src/assets/native_assets.dart';
@@ -13,6 +14,8 @@ export 'src/devtools/tree_inspector.dart';
 export 'src/platform/method_channel.dart';
 export 'src/widgets/media_query.dart';
 export 'src/widgets/form.dart';
+export 'src/widgets/grid.dart';
+export 'src/widgets/slivers.dart';
 export 'src/navigation/dialog.dart';
 export 'src/navigation/tab.dart';
 export 'src/navigation/navigator.dart';

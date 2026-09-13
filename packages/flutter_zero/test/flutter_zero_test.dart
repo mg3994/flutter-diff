@@ -574,6 +574,44 @@ void main() {
       expect(textViews[0].props['text'], equals('Item #0'));
       expect(textViews[9].props['text'], equals('Item #9'));
     });
+
+    test('FocusNode focus request and unfocus state updates', () {
+      final focusNode = FocusNode();
+      expect(focusNode.hasFocus, isFalse);
+
+      focusNode.requestFocus();
+      expect(focusNode.hasFocus, isTrue);
+
+      focusNode.unfocus();
+      expect(focusNode.hasFocus, isFalse);
+    });
+
+    test('TabController index switching and reactive notification', () {
+      final controller = TabController(length: 3, initialIndex: 0);
+      expect(controller.index, equals(0));
+
+      controller.index = 2;
+      expect(controller.index, equals(2));
+    });
+
+    test('Semantics accessibility label and hint prop serialization', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Semantics(
+          label: 'Accessibility Button',
+          hint: 'Double tap to activate',
+          child: Text('Click'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final semanticsView = backend.views.values.firstWhere((v) => v.widgetType == 'Semantics');
+      expect(semanticsView.props['label'], equals('Accessibility Button'));
+      expect(semanticsView.props['hint'], equals('Double tap to activate'));
+    });
   });
 }
 

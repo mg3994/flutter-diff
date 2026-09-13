@@ -658,7 +658,77 @@ void main() {
       final sliverView = backend.views.values.firstWhere((v) => v.widgetType == 'SliverList');
       expect(sliverView, isNotNull);
     });
+
+    test('Draggable and DragTarget interaction flow', () {
+      final backend = VirtualNativeUIBackend();
+      bool accepted = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Row(
+          children: [
+            const Draggable<String>(data: 'drag_payload', child: Text('Source')),
+            DragTarget<String>(
+              onAccept: (data) {
+                if (data == 'drag_payload') accepted = true;
+              },
+              builder: (ctx, cand) => const Text('Target'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final gestureViews = backend.views.values.where((v) => v.widgetType == 'GestureDetector').toList();
+      backend.dispatchNativeEvent(gestureViews[0].handle, 'longPress', {});
+      backend.dispatchNativeEvent(gestureViews[1].handle, 'tap', {});
+
+      expect(accepted, isTrue);
+    });
+
+    test('PagingController page appending and PagedListView rendering', () {
+      final backend = VirtualNativeUIBackend();
+      final controller = PagingController<int, String>(firstPageKey: 0);
+
+      final app = FlutterZeroApp(
+        rootWidget: PagedListView<int, String>(
+          pagingController: controller,
+          itemBuilder: (ctx, item, idx) => Text(item),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      controller.appendPage(['Page Item 1', 'Page Item 2'], 1);
+
+      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
+      expect(textViews.length, equals(2));
+      expect(textViews[0].props['text'], equals('Page Item 1'));
+    });
+
+    test('HydratedStateNotifier state serialization and restoration', () {
+      HydratedStateNotifier.clearStorage();
+      final notifier = _TestHydratedNotifier();
+
+      notifier.value = 99;
+      expect(notifier.value, equals(99));
+
+      final restoredNotifier = _TestHydratedNotifier();
+      expect(restoredNotifier.value, equals(99));
+    });
   });
+}
+
+class _TestHydratedNotifier extends HydratedStateNotifier<int> {
+  _TestHydratedNotifier() : super(0, storageKey: 'test_hydrated_key');
+
+  @override
+  int? fromJson(Map<String, dynamic> json) => json['val'] as int?;
+
+  @override
+  Map<String, dynamic> toJson(int state) => {'val': state};
 }
 
 class _LocaleConsumerWidget extends StatelessWidget {

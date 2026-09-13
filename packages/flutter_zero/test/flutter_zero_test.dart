@@ -537,6 +537,43 @@ void main() {
       restoredInt.restore(bucket, 'int_key');
       expect(restoredInt.value, equals(42));
     });
+
+    test('AdaptiveButton rendering for platform targets', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const AdaptiveButton(
+          platform: TargetPlatform.iOS,
+          child: Text('iOS Native Button'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final buttonView = backend.views.values.firstWhere((v) => v.widgetType == 'Button');
+      expect(buttonView, isNotNull);
+    });
+
+    test('ListView.builder virtualized list item generation', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: ListView.builder(
+          itemCount: 10,
+          itemExtent: 40.0,
+          itemBuilder: (context, index) => Text('Item #$index'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
+      expect(textViews.length, equals(10));
+      expect(textViews[0].props['text'], equals('Item #0'));
+      expect(textViews[9].props['text'], equals('Item #9'));
+    });
   });
 }
 

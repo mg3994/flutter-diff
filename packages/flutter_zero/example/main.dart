@@ -1,30 +1,57 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
 void main() {
-  print('=== Initializing Flutter Zero App with JNI, Native Assets & Restoration ===');
+  print('=== Initializing Flutter Zero App with Adaptive Controls & ListView.builder ===\n');
 
-  final jniBackend = JNINativeUIBackend();
-  final asset = NativeAssetBundle.instance.loadNativeLibrary('libnative_ui.so');
-
-  print('Native asset bundle dynamic library loaded: ${asset != null}');
-
-  final bucket = RestorationBucket();
-  final counterState = RestorableInt(0);
-
-  counterState.value = 10;
-  counterState.save(bucket, 'counter_key');
-  print('Saved restoration bucket value: ${bucket.read<int>('counter_key')}');
+  final backend = VirtualNativeUIBackend();
 
   final app = FlutterZeroApp(
-    rootWidget: const Container(
-      backgroundColor: '#FFFFFF',
-      child: Text('Flutter Zero Native JNI & Native Assets Architecture'),
+    rootWidget: Container(
+      backgroundColor: '#FAFAFA',
+      child: Padding(
+        padding: 20.0,
+        child: Column(
+          children: [
+            const Text(
+              'Flutter Zero Adaptive Controls & Virtualized List',
+              fontSize: 18.0,
+              color: '#222222',
+            ),
+            const SizedBox(height: 15.0),
+            Row(
+              children: [
+                AdaptiveButton(
+                  platform: TargetPlatform.iOS,
+                  onPressed: () => print('Cupertino Button Clicked!'),
+                  child: const Text('Cupertino Native Button'),
+                ),
+                const SizedBox(width: 10.0),
+                const Expanded(
+                  child: AdaptiveTextField(
+                    placeholder: 'Adaptive native text input...',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15.0),
+            Expanded(
+              child: ListView.builder(
+                itemCount: 5,
+                itemExtent: 35.0,
+                itemBuilder: (context, index) {
+                  return Text('Virtualized List Item #$index', fontSize: 13.0);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     ),
-    backend: jniBackend,
+    backend: backend,
   );
 
   app.run();
 
-  print('\n=== Serialized JNI Native View Tree ===');
-  print(jniBackend.serializeJNIViewTree());
+  print('=== Native View Hierarchy ===');
+  print(backend.printTree());
 }

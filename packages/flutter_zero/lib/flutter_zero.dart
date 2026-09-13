@@ -3,6 +3,7 @@ library flutter_zero;
 export 'src/animation/animation.dart';
 export 'src/assets/native_assets.dart';
 export 'src/widgets/async.dart';
+export 'src/widgets/adaptive.dart';
 export 'src/widgets/image.dart';
 export 'src/widgets/custom_paint.dart';
 export 'src/i18n/localizations.dart';

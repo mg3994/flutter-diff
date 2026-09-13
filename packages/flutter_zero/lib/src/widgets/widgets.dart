@@ -1146,15 +1146,29 @@ class StackElement extends NativeRenderElement {
   }
 }
 
+typedef IndexedWidgetBuilder = Widget Function(BuildContext context, int index);
+
 class ListView extends NativeRenderWidget {
   final List<Widget> children;
   final double itemExtent;
+  final IndexedWidgetBuilder? itemBuilder;
+  final int? itemCount;
 
   const ListView({
     super.key,
     this.children = const [],
     this.itemExtent = 50.0,
-  });
+  })  : itemBuilder = null,
+        itemCount = null;
+
+  const ListView.builder({
+    super.key,
+    required IndexedWidgetBuilder itemBuilder,
+    int? itemCount,
+    this.itemExtent = 50.0,
+  })  : children = const [],
+        itemBuilder = itemBuilder,
+        itemCount = itemCount;
 
   @override
   Element createElement() => ListViewElement(this);
@@ -1196,11 +1210,20 @@ class ListViewElement extends NativeRenderElement {
   @override
   ListView get widget => super.widget as ListView;
 
+  List<Widget> _resolveChildren(ListView listView) {
+    if (listView.itemBuilder != null) {
+      final count = listView.itemCount ?? 0;
+      return List.generate(count, (i) => listView.itemBuilder!(this, i));
+    }
+    return listView.children;
+  }
+
   @override
   void mount(Element? parent) {
     super.mount(parent);
     final multiNode = renderNode as MultiChildNativeRenderNode;
-    _childElements = widget.children.map((w) {
+    final childrenToMount = _resolveChildren(widget);
+    _childElements = childrenToMount.map((w) {
       final el = w.createElement();
       el.mount(this);
       if (el.renderNode != null) {
@@ -1218,7 +1241,7 @@ class ListViewElement extends NativeRenderElement {
     super.update(newWidget);
     final newListView = newWidget as ListView;
     final multiNode = renderNode as MultiChildNativeRenderNode;
-    final newChildrenWidgets = newListView.children;
+    final newChildrenWidgets = _resolveChildren(newListView);
 
     final List<Element> newChildElements = [];
     multiNode.children.clear();

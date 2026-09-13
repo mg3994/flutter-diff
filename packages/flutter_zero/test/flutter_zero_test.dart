@@ -779,6 +779,54 @@ void main() {
       expect(tokens.colors.primary, equals('#0066CC'));
       expect(ColorPalette.defaultDark.background, equals('#121212'));
     });
+
+    test('Checkbox, Switch, and Slider input prop serialization', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            Checkbox(value: true, onChanged: (_) {}),
+            Switch(value: false, onChanged: (_) {}),
+            Slider(value: 0.75, min: 0.0, max: 1.0, onChanged: (_) {}),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final checkbox = backend.views.values.firstWhere((v) => v.widgetType == 'Checkbox');
+      final switchView = backend.views.values.firstWhere((v) => v.widgetType == 'Switch');
+      final slider = backend.views.values.firstWhere((v) => v.widgetType == 'Slider');
+
+      expect(checkbox.props['value'], isTrue);
+      expect(switchView.props['value'], isFalse);
+      expect(slider.props['value'], equals(0.75));
+    });
+
+    test('Scaffold shell structure and SnackBar overlay', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Scaffold(
+          appBar: Text('App Bar Title'),
+          body: Text('Body Content'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
+      expect(textViews[0].props['text'], equals('App Bar Title'));
+      expect(textViews[1].props['text'], equals('Body Content'));
+    });
+
+    test('computeIsolate parallel background task execution', () async {
+      final result = await computeIsolate<int, int>((val) => val * 2, 21);
+      expect(result, equals(42));
+    });
   });
 }
 

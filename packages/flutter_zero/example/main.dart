@@ -1,34 +1,34 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
 void main() {
-  print('=== Initializing Flutter Zero Complete Showcase App ===\n');
+  print('=== Initializing Flutter Zero App with Scaffold, Inputs & Isolate Compute ===\n');
 
   final backend = VirtualNativeUIBackend();
-  const tokens = DesignTokens.standard;
 
   final app = FlutterZeroApp(
-    rootWidget: Container(
-      backgroundColor: tokens.colors.background,
-      child: Padding(
-        padding: tokens.mediumSpacing,
-        child: Column(
-          children: [
-            Text(
-              'Flutter Zero Canvas-Less Architecture',
-              fontSize: 18.0,
-              color: tokens.colors.primary,
-            ),
-            SizedBox(height: tokens.smallSpacing),
-            Row(
-              children: [
-                Chip(label: Text('FFI Interop')),
-                SizedBox(width: tokens.smallSpacing),
-                Chip(label: Text('JNI Native Views')),
-                SizedBox(width: tokens.smallSpacing),
-                Chip(label: Text('Zero Canvas')),
-              ],
-            ),
-          ],
+    rootWidget: Scaffold(
+      appBar: Container(
+        backgroundColor: '#0066CC',
+        child: const Padding(
+          padding: 12.0,
+          child: Text('Flutter Zero Native Scaffold Bar', color: '#FFFFFF'),
+        ),
+      ),
+      body: Container(
+        backgroundColor: '#FAFAFA',
+        child: Padding(
+          padding: 20.0,
+          child: Column(
+            children: [
+              const Text('Native Form Inputs & Controls:'),
+              const SizedBox(height: 10.0),
+              Checkbox(value: true, onChanged: (val) {}),
+              const SizedBox(height: 10.0),
+              Switch(value: true, onChanged: (val) {}),
+              const SizedBox(height: 10.0),
+              Slider(value: 0.5, onChanged: (val) {}),
+            ],
+          ),
         ),
       ),
     ),

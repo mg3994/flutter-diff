@@ -718,6 +718,37 @@ void main() {
       final restoredNotifier = _TestHydratedNotifier();
       expect(restoredNotifier.value, equals(99));
     });
+
+    test('CurvedAnimation transform calculation', () {
+      final controller = AnimationController(duration: const Duration(seconds: 1), initialValue: 0.5);
+      final curved = CurvedAnimation(parent: controller, curve: Curves.easeInOut);
+
+      expect(curved.value, equals(0.5));
+    });
+
+    test('NetworkImageCache URL caching and lookup', () {
+      final cache = NetworkImageCache.instance;
+      cache.clear();
+
+      expect(cache.isCached('https://example.com/a.png'), isFalse);
+      cache.cacheImage('https://example.com/a.png', '/tmp/a.png');
+
+      expect(cache.isCached('https://example.com/a.png'), isTrue);
+      expect(cache.getCachedPath('https://example.com/a.png'), equals('/tmp/a.png'));
+    });
+
+    test('WindowController title and size manipulation', () {
+      final backend = VirtualNativeUIBackend();
+      final handle = backend.createView('Window', {'title': 'Initial'});
+      final controller = WindowController(backend: backend, windowHandle: handle);
+
+      controller.setTitle('Updated Title');
+      controller.setSize(const Size(1024, 768));
+
+      final view = backend.getView(handle);
+      expect(view?.props['title'], equals('Updated Title'));
+      expect(view?.size, equals(const Size(1024, 768)));
+    });
   });
 }
 

@@ -773,6 +773,12 @@ void main() {
       PluginRegistry.dispatchNativeEvent('test_event', {'foo': 'bar'});
       expect(plugin.lastEvent, equals('test_event'));
     });
+
+    test('DesignTokens and ColorPalette light and dark theme metrics', () {
+      const tokens = DesignTokens.standard;
+      expect(tokens.colors.primary, equals('#0066CC'));
+      expect(ColorPalette.defaultDark.background, equals('#121212'));
+    });
   });
 }
 

@@ -233,13 +233,17 @@ class ButtonElement extends NativeRenderElement {
     if (_childElement!.renderNode != null) {
       (renderNode as SingleChildNativeRenderNode).child = _childElement!.renderNode;
     }
-    _registerEvents();
+    renderNode?.onNativeHandleCreated = (handle) {
+      _registerEvents(handle);
+    };
+    if (renderNode?.nativeHandle != null) {
+      _registerEvents(renderNode!.nativeHandle!);
+    }
   }
 
-  void _registerEvents() {
-    final handle = renderNode?.nativeHandle;
+  void _registerEvents(int handle) {
     final backend = appOwner?.backend;
-    if (handle != null && backend != null && widget.onPressed != null) {
+    if (backend != null && widget.onPressed != null) {
       backend.registerEventListener(handle, 'click', (eventName, data) {
         widget.onPressed?.call();
       });
@@ -261,7 +265,9 @@ class ButtonElement extends NativeRenderElement {
       }
     }
     (renderNode as SingleChildNativeRenderNode).child = _childElement?.renderNode;
-    _registerEvents();
+    if (renderNode?.nativeHandle != null) {
+      _registerEvents(renderNode!.nativeHandle!);
+    }
   }
 
   @override
@@ -312,13 +318,17 @@ class TextFieldElement extends NativeRenderElement {
   @override
   void mount(Element? parent) {
     super.mount(parent);
-    _registerEvents();
+    renderNode?.onNativeHandleCreated = (handle) {
+      _registerEvents(handle);
+    };
+    if (renderNode?.nativeHandle != null) {
+      _registerEvents(renderNode!.nativeHandle!);
+    }
   }
 
-  void _registerEvents() {
-    final handle = renderNode?.nativeHandle;
+  void _registerEvents(int handle) {
     final backend = appOwner?.backend;
-    if (handle != null && backend != null && widget.onChanged != null) {
+    if (backend != null && widget.onChanged != null) {
       backend.registerEventListener(handle, 'change', (eventName, data) {
         final newText = data['text'] as String? ?? '';
         widget.onChanged?.call(newText);
@@ -329,7 +339,9 @@ class TextFieldElement extends NativeRenderElement {
   @override
   void update(Widget newWidget) {
     super.update(newWidget);
-    _registerEvents();
+    if (renderNode?.nativeHandle != null) {
+      _registerEvents(renderNode!.nativeHandle!);
+    }
   }
 }
 

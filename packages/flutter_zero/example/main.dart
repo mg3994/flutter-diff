@@ -1,42 +1,33 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
-class SamplePlugin extends FlutterZeroPlugin {
-  SamplePlugin() : super('sample_plugin');
-
-  @override
-  void onAppInit() {
-    print('SamplePlugin initialized!');
-  }
-
-  @override
-  void onNativeEvent(String eventName, Map<String, dynamic> data) {
-    print('SamplePlugin received native event: $eventName');
-  }
-}
-
 void main() {
-  print('=== Initializing Flutter Zero App with KeyframeSequence & PluginRegistry ===\n');
-
-  PluginRegistry.register(SamplePlugin());
-
-  final seq = KeyframeSequence<double>([
-    const Keyframe(0.0, 0.0),
-    const Keyframe(0.5, 100.0),
-    const Keyframe(1.0, 200.0),
-  ]);
-
-  print('Keyframe sequence value at fraction 0.5: ${seq.transform(0.5)}');
+  print('=== Initializing Flutter Zero Complete Showcase App ===\n');
 
   final backend = VirtualNativeUIBackend();
+  const tokens = DesignTokens.standard;
 
   final app = FlutterZeroApp(
-    rootWidget: const Container(
-      backgroundColor: '#FAFAFA',
+    rootWidget: Container(
+      backgroundColor: tokens.colors.background,
       child: Padding(
-        padding: 20.0,
+        padding: tokens.mediumSpacing,
         child: Column(
           children: [
-            Text('Flutter Zero Extensible Native Engine Architecture'),
+            Text(
+              'Flutter Zero Canvas-Less Architecture',
+              fontSize: 18.0,
+              color: tokens.colors.primary,
+            ),
+            SizedBox(height: tokens.smallSpacing),
+            Row(
+              children: [
+                Chip(label: Text('FFI Interop')),
+                SizedBox(width: tokens.smallSpacing),
+                Chip(label: Text('JNI Native Views')),
+                SizedBox(width: tokens.smallSpacing),
+                Chip(label: Text('Zero Canvas')),
+              ],
+            ),
           ],
         ),
       ),
@@ -46,8 +37,6 @@ void main() {
 
   app.run();
 
-  PluginRegistry.dispatchNativeEvent('app_ready', {'status': 'ok'});
-
-  print('\n=== Native View Hierarchy ===');
+  print('=== Native View Hierarchy ===');
   print(backend.printTree());
 }

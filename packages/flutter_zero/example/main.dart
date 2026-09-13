@@ -1,21 +1,33 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
+class SamplePlugin extends FlutterZeroPlugin {
+  SamplePlugin() : super('sample_plugin');
+
+  @override
+  void onAppInit() {
+    print('SamplePlugin initialized!');
+  }
+
+  @override
+  void onNativeEvent(String eventName, Map<String, dynamic> data) {
+    print('SamplePlugin received native event: $eventName');
+  }
+}
+
 void main() {
-  print('=== Initializing Flutter Zero App with Curves, Image Cache & WindowController ===\n');
+  print('=== Initializing Flutter Zero App with KeyframeSequence & PluginRegistry ===\n');
+
+  PluginRegistry.register(SamplePlugin());
+
+  final seq = KeyframeSequence<double>([
+    const Keyframe(0.0, 0.0),
+    const Keyframe(0.5, 100.0),
+    const Keyframe(1.0, 200.0),
+  ]);
+
+  print('Keyframe sequence value at fraction 0.5: ${seq.transform(0.5)}');
 
   final backend = VirtualNativeUIBackend();
-
-  final parentAnim = AnimationController(duration: const Duration(seconds: 1));
-  final curvedAnim = CurvedAnimation(parent: parentAnim, curve: Curves.easeInOut);
-
-  print('Curved Animation value at 0.5: ${curvedAnim.value}');
-
-  NetworkImageCache.instance.cacheImage('https://flutter.dev/logo.png', '/cache/logo.png');
-  print('Is image cached: ${NetworkImageCache.instance.isCached('https://flutter.dev/logo.png')}');
-
-  final windowHandle = backend.createView('Window', {'title': 'Main Shell Window'});
-  final windowController = WindowController(backend: backend, windowHandle: windowHandle);
-  windowController.setTitle('Updated Desktop Shell Title');
 
   final app = FlutterZeroApp(
     rootWidget: const Container(
@@ -24,7 +36,7 @@ void main() {
         padding: 20.0,
         child: Column(
           children: [
-            Text('Flutter Zero Desktop & Mobile Native Shell Engine'),
+            Text('Flutter Zero Extensible Native Engine Architecture'),
           ],
         ),
       ),
@@ -33,6 +45,8 @@ void main() {
   );
 
   app.run();
+
+  PluginRegistry.dispatchNativeEvent('app_ready', {'status': 'ok'});
 
   print('\n=== Native View Hierarchy ===');
   print(backend.printTree());

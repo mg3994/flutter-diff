@@ -749,7 +749,48 @@ void main() {
       expect(view?.props['title'], equals('Updated Title'));
       expect(view?.size, equals(const Size(1024, 768)));
     });
+
+    test('KeyframeSequence interpolation steps', () {
+      final seq = KeyframeSequence<double>([
+        const Keyframe(0.0, 0.0),
+        const Keyframe(0.5, 50.0),
+        const Keyframe(1.0, 100.0),
+      ]);
+
+      expect(seq.transform(0.0), equals(0.0));
+      expect(seq.transform(0.25), equals(25.0));
+      expect(seq.transform(0.5), equals(50.0));
+      expect(seq.transform(1.0), equals(100.0));
+    });
+
+    test('PluginRegistry registration and event dispatching', () {
+      final plugin = _TestPlugin('test_plugin');
+      PluginRegistry.register(plugin);
+
+      expect(PluginRegistry.isRegistered('test_plugin'), isTrue);
+      expect(plugin.initialized, isTrue);
+
+      PluginRegistry.dispatchNativeEvent('test_event', {'foo': 'bar'});
+      expect(plugin.lastEvent, equals('test_event'));
+    });
   });
+}
+
+class _TestPlugin extends FlutterZeroPlugin {
+  bool initialized = false;
+  String? lastEvent;
+
+  _TestPlugin(super.name);
+
+  @override
+  void onAppInit() {
+    initialized = true;
+  }
+
+  @override
+  void onNativeEvent(String eventName, Map<String, dynamic> data) {
+    lastEvent = eventName;
+  }
 }
 
 class _TestHydratedNotifier extends HydratedStateNotifier<int> {

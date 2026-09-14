@@ -827,6 +827,50 @@ void main() {
       final result = await computeIsolate<int, int>((val) => val * 2, 21);
       expect(result, equals(42));
     });
+
+    test('Transform scale and rotation prop serialization', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Transform(
+          scale: 1.5,
+          rotation: 0.5,
+          child: Text('Transformed'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final transformView = backend.views.values.firstWhere((v) => v.widgetType == 'Transform');
+      expect(transformView.props['scale'], equals(1.5));
+      expect(transformView.props['rotation'], equals(0.5));
+    });
+
+    test('ClipRRect border radius prop serialization', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const ClipRRect(
+          borderRadius: 16.0,
+          child: Text('Clipped'),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final clipView = backend.views.values.firstWhere((v) => v.widgetType == 'ClipRRect');
+      expect(clipView.props['borderRadius'], equals(16.0));
+    });
+
+    test('AssetBundle string loading', () async {
+      final bundle = NetworkAssetBundle();
+      bundle.registerMockAsset('test.txt', 'hello_world');
+
+      final content = await bundle.loadString('test.txt');
+      expect(content, equals('hello_world'));
+    });
   });
 }
 

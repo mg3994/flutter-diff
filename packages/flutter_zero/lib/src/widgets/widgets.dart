@@ -1078,6 +1078,8 @@ class StackElement extends NativeRenderElement {
           el.renderNode!.props['left'] = w.left;
           el.renderNode!.props['right'] = w.right;
           el.renderNode!.props['bottom'] = w.bottom;
+          el.renderNode!.props['width'] = w.width;
+          el.renderNode!.props['height'] = w.height;
         }
         multiNode.addChild(el.renderNode!);
       }
@@ -1135,6 +1137,8 @@ class StackElement extends NativeRenderElement {
           el.renderNode!.props['left'] = w.left;
           el.renderNode!.props['right'] = w.right;
           el.renderNode!.props['bottom'] = w.bottom;
+          el.renderNode!.props['width'] = w.width;
+          el.renderNode!.props['height'] = w.height;
         }
         multiNode.addChild(el.renderNode!);
       }

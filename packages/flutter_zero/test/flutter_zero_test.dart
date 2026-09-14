@@ -1224,6 +1224,89 @@ void main() {
       expect(heroView.props['tag'], equals('hero_tag'));
     });
 
+    test('PageView, PageController, SliverToBoxAdapter, and SliverPadding widgets', () {
+      final backend = VirtualNativeUIBackend();
+      final controller = PageController(initialPage: 0);
+      int changedPage = -1;
+
+      final app = FlutterZeroApp(
+        rootWidget: PageView(
+          controller: controller,
+          onPageChanged: (p) => changedPage = p,
+          children: const [
+            SliverToBoxAdapter(child: Text('Page 0')),
+            SliverPadding(padding: 10.0, sliver: Text('Page 1')),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final pageView = backend.views.values.firstWhere((v) => v.widgetType == 'PageView');
+      backend.dispatchNativeEvent(pageView.handle, 'pageChange', {'page': 1});
+
+      expect(changedPage, equals(1));
+      expect(controller.page, equals(1));
+    });
+
+    test('SwitchListTile, RadioListTile, ChoiceChip, BottomSheet, and MaterialBanner widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool switchVal = false;
+      String radioGroup = 'X';
+      bool chipSelected = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            SwitchListTile(
+              value: switchVal,
+              onChanged: (v) => switchVal = v,
+              title: const Text('Switch Tile'),
+            ),
+            RadioListTile<String>(
+              value: 'Y',
+              groupValue: radioGroup,
+              onChanged: (v) {
+                if (v != null) radioGroup = v;
+              },
+              title: const Text('Radio Tile'),
+            ),
+            ChoiceChip(
+              label: const Text('Chip'),
+              selected: chipSelected,
+              onSelected: (s) => chipSelected = s,
+            ),
+            const BottomSheet(
+              child: Text('Sheet Content'),
+            ),
+            const MaterialBanner(
+              content: Text('Banner Message'),
+              actions: [Text('Action')],
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final switchTile = backend.views.values.firstWhere((v) => v.widgetType == 'SwitchListTile');
+      backend.dispatchNativeEvent(switchTile.handle, 'toggle', {'value': true});
+      expect(switchVal, isTrue);
+
+      final radioTile = backend.views.values.firstWhere((v) => v.widgetType == 'RadioListTile');
+      backend.dispatchNativeEvent(radioTile.handle, 'click', {});
+      expect(radioGroup, equals('Y'));
+
+      final choiceChip = backend.views.values.firstWhere((v) => v.widgetType == 'ChoiceChip');
+      backend.dispatchNativeEvent(choiceChip.handle, 'select', {});
+      expect(chipSelected, isTrue);
+
+      final bottomSheet = backend.views.values.firstWhere((v) => v.widgetType == 'BottomSheet');
+      expect(bottomSheet, isNotNull);
+    });
+
     test('Opacity, Dismissible, and ReorderableListView visual and interaction widgets', () {
       final backend = VirtualNativeUIBackend();
       bool dismissed = false;

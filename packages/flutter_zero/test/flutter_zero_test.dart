@@ -976,6 +976,34 @@ void main() {
       await client.close();
       expect(client.isConnected, isFalse);
     });
+
+    test('ZeroSQLiteDatabase open, insert, query and close operations', () async {
+      final db = ZeroSQLiteDatabase(path: '/tmp/test.db');
+      await db.open();
+      expect(db.isOpen, isTrue);
+
+      await db.execute('CREATE TABLE users (id INT, name TEXT)');
+      await db.insert('users', {'id': 1, 'name': 'Alice'});
+
+      final rows = await db.query('users');
+      expect(rows.length, equals(1));
+      expect(rows.first['name'], equals('Alice'));
+
+      await db.close();
+      expect(db.isOpen, isFalse);
+    });
+
+    test('NativeBarcodeScanner widget creation', () {
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: const NativeBarcodeScanner(),
+        backend: backend,
+      );
+      app.run();
+
+      final scannerView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeBarcodeScanner');
+      expect(scannerView, isNotNull);
+    });
   });
 }
 

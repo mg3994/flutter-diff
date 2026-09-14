@@ -58,3 +58,13 @@ class TextStyle {
     this.fontWeight,
   });
 }
+
+class ZeroThemeEngine {
+  static bool _isDarkMode = false;
+
+  static bool get isDarkMode => _isDarkMode;
+
+  static void setDarkMode(bool isDark) {
+    _isDarkMode = isDark;
+  }
+}

@@ -896,6 +896,29 @@ void main() {
       server.stop();
       expect(server.isRunning, isFalse);
     });
+
+    test('ZeroHttpClient & ZeroPreferences storage and network requests', () async {
+      final res = await ZeroHttpClient.get('https://api.example.com');
+      expect(res.isSuccess, isTrue);
+
+      await ZeroPreferences.setString('user_token', 'abc_123');
+      expect(ZeroPreferences.getString('user_token'), equals('abc_123'));
+    });
+
+    test('NativeMediaPlayerWidget and ZeroThemeEngine mode changes', () {
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: const NativeMediaPlayerWidget(mediaUrl: 'https://video.mp4'),
+        backend: backend,
+      );
+      app.run();
+
+      final mediaView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeMediaPlayer');
+      expect(mediaView.props['mediaUrl'], equals('https://video.mp4'));
+
+      ZeroThemeEngine.setDarkMode(true);
+      expect(ZeroThemeEngine.isDarkMode, isTrue);
+    });
   });
 }
 

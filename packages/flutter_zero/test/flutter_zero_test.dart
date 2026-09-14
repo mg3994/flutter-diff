@@ -1250,6 +1250,55 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('InputChip, RawChip, CupertinoPopupSurface, and CalendarDatePicker widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool chipClicked = false;
+      bool chipDeleted = false;
+      DateTime? selectedCalendarDate;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            InputChip(
+              label: const Text('Input Chip'),
+              onPressed: () => chipClicked = true,
+              onDeleted: () => chipDeleted = true,
+            ),
+            RawChip(
+              label: const Text('Raw Chip'),
+              selected: true,
+            ),
+            const CupertinoPopupSurface(
+              child: Text('Popup Content'),
+            ),
+            CalendarDatePicker(
+              initialDate: DateTime(2025, 1, 1),
+              firstDate: DateTime(2020, 1, 1),
+              lastDate: DateTime(2030, 1, 1),
+              onDateChanged: (d) => selectedCalendarDate = d,
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final inputChip = backend.views.values.firstWhere((v) => v.widgetType == 'InputChip');
+      backend.dispatchNativeEvent(inputChip.handle, 'click', {});
+      expect(chipClicked, isTrue);
+
+      backend.dispatchNativeEvent(inputChip.handle, 'delete', {});
+      expect(chipDeleted, isTrue);
+
+      final popupSurface = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoPopupSurface');
+      expect(popupSurface, isNotNull);
+
+      final calendarDatePicker = backend.views.values.firstWhere((v) => v.widgetType == 'CalendarDatePicker');
+      backend.dispatchNativeEvent(calendarDatePicker.handle, 'dateChange', {'isoString': '2025-08-20T00:00:00.000'});
+      expect(selectedCalendarDate, equals(DateTime(2025, 8, 20)));
+    });
+
     test('SnackBar, CupertinoContextMenu, and SliverFillViewport widgets', () {
       final backend = VirtualNativeUIBackend();
       bool snackBarActionClicked = false;

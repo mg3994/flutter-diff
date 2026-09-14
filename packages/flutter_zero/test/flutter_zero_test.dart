@@ -1004,7 +1004,38 @@ void main() {
       final scannerView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeBarcodeScanner');
       expect(scannerView, isNotNull);
     });
+
+    test('ZeroSecureStorage and ZeroBiometricAuth operations', () async {
+      await ZeroSecureStorage.write(key: 'secret_key', value: 'secret_val');
+      expect(await ZeroSecureStorage.read(key: 'secret_key'), equals('secret_val'));
+
+      expect(await ZeroBiometricAuth.isBiometricsAvailable(), isTrue);
+      expect(await ZeroBiometricAuth.authenticate(localizedReason: 'Scan fingerprint'), isTrue);
+    });
+
+    test('ZeroUtils uuid generation, sha256 hashing, and ZeroModel equality', () {
+      final uuid1 = ZeroUtils.generateUuid();
+      final uuid2 = ZeroUtils.generateUuid();
+      expect(uuid1, isNot(equals(uuid2)));
+
+      final hash = ZeroUtils.sha256Hash('hello');
+      expect(hash, equals('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'));
+
+      final m1 = _TestModel('A', 10);
+      final m2 = _TestModel('A', 10);
+      expect(m1, equals(m2));
+    });
   });
+}
+
+class _TestModel extends ZeroModel {
+  final String name;
+  final int value;
+
+  const _TestModel(this.name, this.value);
+
+  @override
+  List<Object?> get props => [name, value];
 }
 
 class _TestPlugin extends FlutterZeroPlugin {

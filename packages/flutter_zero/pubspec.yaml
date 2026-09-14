@@ -7,9 +7,12 @@ environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
+  crypto: ^3.0.7
   dio: ^5.11.1
+  equatable: ^2.1.0
   ffi: ^2.1.0
   signals_core: ^7.0.0
+  uuid: ^4.6.0
 
 dev_dependencies:
   test: ^1.24.0

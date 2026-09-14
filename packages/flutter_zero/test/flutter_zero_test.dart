@@ -899,7 +899,37 @@ void main() {
       expect(textView.props['fontSize'], equals(16.0));
       expect(textView.props['color'], equals('#123456'));
     });
+
+    test('EventBus broadcast event dispatching', () async {
+      final bus = EventBus(sync: true);
+      String? receivedData;
+
+      bus.on<_TestEvent>().listen((e) {
+        receivedData = e.payload;
+      });
+
+      bus.fire(const _TestEvent('bus_data'));
+      expect(receivedData, equals('bus_data'));
+    });
+
+    test('StateMachine state transitions', () {
+      final sm = StateMachine<String, String>('off', {
+        'off': {'toggle': 'on'},
+        'on': {'toggle': 'off'},
+      });
+
+      expect(sm.value, equals('off'));
+      expect(sm.canTransition('toggle'), isTrue);
+
+      sm.trigger('toggle');
+      expect(sm.value, equals('on'));
+    });
   });
+}
+
+class _TestEvent extends Event {
+  final String payload;
+  const _TestEvent(this.payload);
 }
 
 class _TestPlugin extends FlutterZeroPlugin {

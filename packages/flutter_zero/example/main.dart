@@ -1,38 +1,58 @@
 import 'package:flutter_zero/flutter_zero.dart';
 
+class CustomUserLoginEvent extends Event {
+  final String username;
+  const CustomUserLoginEvent(this.username);
+}
+
+enum AppStatus { loggedOut, loggingIn, loggedIn }
+enum AuthTrigger { login, logout }
+
 void main() async {
-  print('=== Initializing Flutter Zero Showcase with TextStyle & EdgeInsets ===\n');
+  print('=== Initializing Flutter Zero Showcase with EventBus & StateMachine ===\n');
 
   final backend = VirtualNativeUIBackend();
 
+  EventBus.instance.on<CustomUserLoginEvent>().listen((e) {
+    print('EventBus received login event for: ${e.username}');
+  });
+
+  final authMachine = StateMachine<AppStatus, AuthTrigger>(
+    AppStatus.loggedOut,
+    {
+      AppStatus.loggedOut: {AuthTrigger.login: AppStatus.loggedIn},
+      AppStatus.loggedIn: {AuthTrigger.logout: AppStatus.loggedOut},
+    },
+  );
+
+  print('Initial Auth Status: ${authMachine.value}');
+  authMachine.trigger(AuthTrigger.login);
+  print('Auth Status after transition: ${authMachine.value}');
+
+  EventBus.instance.fire(const CustomUserLoginEvent('jules_developer'));
+
   final app = FlutterZeroApp(
-    rootWidget: Container(
-      backgroundColor: '#FAFAFA',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
-        child: Column(
-          children: [
-            Text(
-              'Styled Text with TextStyle',
-              style: TextStyle(
-                fontSize: 18.0,
-                color: const Color(0xFF0066CC),
-              ),
+    rootWidget: ValueListenableBuilder<AppStatus>(
+      valueListenable: authMachine,
+      builder: (ctx, status, child) {
+        return Container(
+          backgroundColor: '#FAFAFA',
+          child: Padding(
+            padding: 20.0,
+            child: Column(
+              children: [
+                Text('Auth Status: ${status.name}'),
+              ],
             ),
-            const SizedBox(height: 10.0),
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
-              child: const Text('Custom EdgeInsets Padding'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     ),
     backend: backend,
   );
 
   app.run();
 
-  print('=== Native View Hierarchy ===');
+  print('\n=== Native View Hierarchy ===');
   print(backend.printTree());
 }

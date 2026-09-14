@@ -1250,6 +1250,71 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('CupertinoButton, CupertinoSwitch, SearchBar, SegmentedButton, IndexedStack, and Transform widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool cupertinoBtnClicked = false;
+      bool cupertinoSwitchVal = false;
+      String searchVal = '';
+      Set<int> segmentedSelection = {1};
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            CupertinoButton(
+              onPressed: () => cupertinoBtnClicked = true,
+              child: const Text('Cupertino Button'),
+            ),
+            CupertinoSwitch(
+              value: cupertinoSwitchVal,
+              onChanged: (v) => cupertinoSwitchVal = v,
+            ),
+            SearchBar(
+              hintText: 'Search...',
+              onChanged: (q) => searchVal = q,
+            ),
+            SegmentedButton<int>(
+              selected: segmentedSelection,
+              segments: const [
+                ButtonSegment(value: 1, label: Text('Seg 1')),
+                ButtonSegment(value: 2, label: Text('Seg 2')),
+              ],
+              onSelectionChanged: (s) => segmentedSelection = s,
+            ),
+            const IndexedStack(
+              index: 0,
+              children: [Text('Page A'), Text('Page B')],
+            ),
+            const Transform.scale(
+              scale: 1.5,
+              child: Text('Scaled'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final cupertinoBtn = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoButton');
+      backend.dispatchNativeEvent(cupertinoBtn.handle, 'click', {});
+      expect(cupertinoBtnClicked, isTrue);
+
+      final cupertinoSwitch = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoSwitch');
+      backend.dispatchNativeEvent(cupertinoSwitch.handle, 'change', {'value': true});
+      expect(cupertinoSwitchVal, isTrue);
+
+      final searchBar = backend.views.values.firstWhere((v) => v.widgetType == 'SearchBar');
+      backend.dispatchNativeEvent(searchBar.handle, 'change', {'text': 'flutter zero'});
+      expect(searchVal, equals('flutter zero'));
+
+      final segmentedBtn = backend.views.values.firstWhere((v) => v.widgetType == 'SegmentedButton');
+      backend.dispatchNativeEvent(segmentedBtn.handle, 'select', {'index': 1});
+      expect(segmentedSelection, equals({2}));
+
+      final transformView = backend.views.values.firstWhere((v) => v.widgetType == 'Transform');
+      expect(transformView.props['scale'], equals(1.5));
+    });
+
     test('CircularProgressIndicator, LinearProgressIndicator, Stepper, Table, ExpansionPanelList, and SimpleDialog widgets', () {
       final backend = VirtualNativeUIBackend();
       bool optionClicked = false;

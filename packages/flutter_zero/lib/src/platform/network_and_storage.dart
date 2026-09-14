@@ -1,38 +1,41 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 
-class ZeroHttpResponse {
-  final int statusCode;
-  final String body;
-  final Map<String, String> headers;
-
-  const ZeroHttpResponse({
-    required this.statusCode,
-    required this.body,
-    this.headers = const {},
-  });
-
-  bool get isSuccess => statusCode >= 200 && statusCode < 300;
-}
+export 'package:dio/dio.dart';
 
 class ZeroHttpClient {
-  static Future<ZeroHttpResponse> get(
+  static final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
+
+  static Dio get client => _dio;
+
+  static Future<Response<dynamic>> get(
     String url, {
-    Map<String, String>? headers,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
   }) async {
-    return const ZeroHttpResponse(
-      statusCode: 200,
-      body: '{"status": "ok"}',
+    return await _dio.get(
+      url,
+      queryParameters: queryParameters,
+      options: options,
     );
   }
 
-  static Future<ZeroHttpResponse> post(
+  static Future<Response<dynamic>> post(
     String url, {
-    Map<String, String>? headers,
-    Object? body,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
   }) async {
-    return const ZeroHttpResponse(
-      statusCode: 201,
-      body: '{"created": true}',
+    return await _dio.post(
+      url,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
     );
   }
 }

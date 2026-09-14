@@ -897,9 +897,8 @@ void main() {
       expect(server.isRunning, isFalse);
     });
 
-    test('ZeroHttpClient & ZeroPreferences storage and network requests', () async {
-      final res = await ZeroHttpClient.get('https://api.example.com');
-      expect(res.isSuccess, isTrue);
+    test('ZeroHttpClient Dio instance & ZeroPreferences storage', () async {
+      expect(ZeroHttpClient.client, isA<Dio>());
 
       await ZeroPreferences.setString('user_token', 'abc_123');
       expect(ZeroPreferences.getString('user_token'), equals('abc_123'));
@@ -918,6 +917,25 @@ void main() {
 
       ZeroThemeEngine.setDarkMode(true);
       expect(ZeroThemeEngine.isDarkMode, isTrue);
+    });
+
+    test('CanvasCommand serialization and AssetWatcher file change notifications', () async {
+      const command = CanvasCommand('drawRect', {'x': 0, 'y': 0, 'width': 100, 'height': 100});
+      expect(command.toJson()['type'], equals('drawRect'));
+
+      final watcher = AssetWatcher();
+      watcher.watchAsset('assets/icon.png');
+
+      String? changed;
+      watcher.onAssetChanged.listen((path) {
+        changed = path;
+      });
+
+      watcher.notifyChanged('assets/icon.png');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(changed, equals('assets/icon.png'));
+      watcher.dispose();
     });
   });
 }

@@ -7,6 +7,7 @@ environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
+  dio: ^5.11.1
   ffi: ^2.1.0
   signals_core: ^7.0.0
 

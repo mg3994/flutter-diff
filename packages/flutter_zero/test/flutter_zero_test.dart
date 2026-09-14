@@ -924,6 +924,23 @@ void main() {
       sm.trigger('toggle');
       expect(sm.value, equals('on'));
     });
+
+    test('NativePointerBridge address and pointer conversion', () {
+      const address = 0xDEADBEEF;
+      final ptr = NativePointerBridge.handleToPointer(address);
+      final handle = NativePointerBridge.pointerToHandle(ptr);
+
+      expect(handle, equals(address));
+    });
+
+    test('AsyncImagePreloader preloading and caching', () async {
+      const url = 'https://example.com/preload.png';
+      expect(NetworkImageCache.instance.isCached(url), isFalse);
+
+      final ok = await AsyncImagePreloader.preload(url);
+      expect(ok, isTrue);
+      expect(NetworkImageCache.instance.isCached(url), isTrue);
+    });
   });
 }
 

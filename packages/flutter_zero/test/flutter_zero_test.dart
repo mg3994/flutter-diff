@@ -1055,6 +1055,33 @@ void main() {
 
       await cubit.close();
     });
+
+    test('ZeroServiceLocator GetIt instance, RxDart BehaviorSubject, NativeCalendar, NativeMap, and ZeroConnectivity', () async {
+      ZeroServiceLocator.registerSingleton<String>('RegisteredService');
+      expect(ZeroServiceLocator.get<String>(), equals('RegisteredService'));
+
+      final subject = BehaviorSubject<int>.seeded(100);
+      expect(subject.value, equals(100));
+      await subject.close();
+
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: const Column(
+          children: [
+            NativeCalendarWidget(),
+            NativeMapWidget(latitude: 37.77, longitude: -122.41),
+          ],
+        ),
+        backend: backend,
+      );
+      app.run();
+
+      final mapNode = backend.views.values.firstWhere((v) => v.widgetType == 'NativeMap');
+      expect(mapNode.props['latitude'], equals(37.77));
+
+      final status = await ZeroConnectivity.checkConnectivity();
+      expect(status, equals(ZeroConnectivityResult.wifi));
+    });
   });
 }
 

@@ -1250,6 +1250,65 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('CircularProgressIndicator, LinearProgressIndicator, Stepper, Table, ExpansionPanelList, and SimpleDialog widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool optionClicked = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const CircularProgressIndicator(value: 0.5, color: '#00FF00'),
+            const LinearProgressIndicator(color: '#FF0000'),
+            Stepper(
+              steps: const [
+                Step(title: Text('Step 1'), content: Text('Step 1 Content')),
+              ],
+            ),
+            const Table(
+              children: [
+                TableRow(children: [Text('Cell 1'), Text('Cell 2')]),
+              ],
+            ),
+            ExpansionPanelList(
+              children: [
+                ExpansionPanel(
+                  headerBuilder: const Text('Header'),
+                  body: const Text('Body'),
+                  isExpanded: true,
+                ),
+              ],
+            ),
+            SimpleDialog(
+              title: const Text('Title'),
+              children: [
+                SimpleDialogOption(
+                  onPressed: () => optionClicked = true,
+                  child: const Text('Option'),
+                ),
+              ],
+            ),
+            const AboutDialog(
+              applicationName: 'Test App',
+              applicationVersion: '1.0.0',
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final circularView = backend.views.values.firstWhere((v) => v.widgetType == 'CircularProgressIndicator');
+      expect(circularView.props['value'], equals(0.5));
+
+      final optionView = backend.views.values.firstWhere((v) => v.widgetType == 'SimpleDialogOption');
+      backend.dispatchNativeEvent(optionView.handle, 'click', {});
+      expect(optionClicked, isTrue);
+
+      final aboutView = backend.views.values.firstWhere((v) => v.widgetType == 'AboutDialog');
+      expect(aboutView.props['name'], equals('Test App'));
+    });
+
     test('SwitchListTile, RadioListTile, ChoiceChip, BottomSheet, and MaterialBanner widgets', () {
       final backend = VirtualNativeUIBackend();
       bool switchVal = false;

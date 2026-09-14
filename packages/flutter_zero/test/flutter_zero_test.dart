@@ -1250,6 +1250,54 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('MouseRegion, Listener, SliverFillRemaining, RichText, and SelectableText widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool mouseEntered = false;
+      bool pointerDown = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            MouseRegion(
+              onEnter: (e) => mouseEntered = true,
+              child: const Text('Hover Me'),
+            ),
+            Listener(
+              onPointerDown: (e) => pointerDown = true,
+              child: const Text('Touch Me'),
+            ),
+            const SliverFillRemaining(
+              child: Text('Remaining Space'),
+            ),
+            const RichText(
+              text: TextSpan(
+                text: 'Rich',
+                children: [TextSpan(text: 'TextSpan')],
+              ),
+            ),
+            const SelectableText('Selectable Text Content'),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final mouseRegionView = backend.views.values.firstWhere((v) => v.widgetType == 'MouseRegion');
+      backend.dispatchNativeEvent(mouseRegionView.handle, 'mouseEnter', {});
+      expect(mouseEntered, isTrue);
+
+      final listenerView = backend.views.values.firstWhere((v) => v.widgetType == 'Listener');
+      backend.dispatchNativeEvent(listenerView.handle, 'pointerDown', {});
+      expect(pointerDown, isTrue);
+
+      final richTextView = backend.views.values.firstWhere((v) => v.widgetType == 'RichText');
+      expect(richTextView, isNotNull);
+
+      final selectableTextView = backend.views.values.firstWhere((v) => v.widgetType == 'SelectableText');
+      expect(selectableTextView.props['text'], equals('Selectable Text Content'));
+    });
+
     test('InkWell, Material, FilterChip, RangeSlider, Autocomplete, CupertinoAlertDialog, and CupertinoDatePicker widgets', () {
       final backend = VirtualNativeUIBackend();
       bool inkWellTapped = false;

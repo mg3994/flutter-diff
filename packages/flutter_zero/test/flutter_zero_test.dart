@@ -871,6 +871,34 @@ void main() {
       final content = await bundle.loadString('test.txt');
       expect(content, equals('hello_world'));
     });
+
+    test('TextStyle and EdgeInsets prop resolution in Text and Padding', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: Text(
+            'Styled Text',
+            style: TextStyle(
+              fontSize: 16.0,
+              color: const Color(0xFF123456),
+            ),
+          ),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final paddingView = backend.views.values.firstWhere((v) => v.widgetType == 'Padding');
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+
+      expect(paddingView.props['paddingTop'], equals(8.0));
+      expect(paddingView.props['paddingLeft'], equals(12.0));
+      expect(textView.props['fontSize'], equals(16.0));
+      expect(textView.props['color'], equals('#123456'));
+    });
   });
 }
 

@@ -1250,6 +1250,52 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('SnackBar, CupertinoContextMenu, and SliverFillViewport widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool snackBarActionClicked = false;
+      bool contextMenuActionClicked = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            SnackBar(
+              content: const Text('Snack Content'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () => snackBarActionClicked = true,
+              ),
+            ),
+            CupertinoContextMenu(
+              actions: [
+                CupertinoContextMenuAction(
+                  onPressed: () => contextMenuActionClicked = true,
+                  child: const Text('Action 1'),
+                ),
+              ],
+              child: const Text('Context Target'),
+            ),
+            const SliverFillViewport(
+              children: [Text('Viewport 1'), Text('Viewport 2')],
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final snackBarAction = backend.views.values.firstWhere((v) => v.widgetType == 'SnackBarAction');
+      backend.dispatchNativeEvent(snackBarAction.handle, 'click', {});
+      expect(snackBarActionClicked, isTrue);
+
+      final menuAction = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoContextMenuAction');
+      backend.dispatchNativeEvent(menuAction.handle, 'click', {});
+      expect(contextMenuActionClicked, isTrue);
+
+      final viewport = backend.views.values.firstWhere((v) => v.widgetType == 'SliverFillViewport');
+      expect(viewport.props['viewportFraction'], equals(1.0));
+    });
+
     test('ElevatedCard, OutlinedCard, Tooltip, CupertinoNavigationBar, CupertinoTextField, and CheckboxFormField widgets', () {
       final backend = VirtualNativeUIBackend();
       String cupertinoInputText = '';

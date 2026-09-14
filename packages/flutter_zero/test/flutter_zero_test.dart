@@ -1082,6 +1082,21 @@ void main() {
       final status = await ZeroConnectivity.checkConnectivity();
       expect(status, equals(ZeroConnectivityResult.wifi));
     });
+
+    test('ZeroIntl formatting, ZeroLogger, and ZeroPath helpers', () {
+      final formattedDate = ZeroIntl.formatDate(DateTime(2025, 1, 15));
+      expect(formattedDate, equals('2025-01-15'));
+
+      final formattedCurrency = ZeroIntl.formatCurrency(1234.5);
+      expect(formattedCurrency.contains('1,234.50'), isTrue);
+
+      ZeroLogger.i('Test log message');
+
+      final joinedPath = ZeroPath.join('folder', 'file.txt');
+      expect(joinedPath, equals('folder/file.txt'));
+      expect(ZeroPath.extension('file.txt'), equals('.txt'));
+      expect(ZeroPath.basename('folder/file.txt'), equals('file.txt'));
+    });
   });
 }
 

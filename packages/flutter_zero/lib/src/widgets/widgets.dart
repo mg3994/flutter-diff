@@ -666,17 +666,45 @@ class RowRenderNode extends MultiChildNativeRenderNode {
   void performLayout(BoxConstraints constraints) {
     double totalWidth = 0.0;
     double maxHeight = 0.0;
+    int totalFlex = 0;
 
     for (final child in children) {
-      child.performLayout(constraints);
-      child.offset = Offset(totalWidth, 0);
-      totalWidth += child.size.width;
-      if (child.size.height > maxHeight) {
-        maxHeight = child.size.height;
+      final flex = child.props['flex'] as int? ?? 0;
+      if (flex == 0) {
+        child.performLayout(constraints);
+        totalWidth += child.size.width;
+        if (child.size.height > maxHeight) maxHeight = child.size.height;
+      } else {
+        totalFlex += flex;
       }
     }
 
-    size = constraints.constrain(Size(totalWidth, maxHeight));
+    final double remainingWidth = constraints.maxWidth.isFinite && constraints.maxWidth > totalWidth
+        ? constraints.maxWidth - totalWidth
+        : 0.0;
+
+    for (final child in children) {
+      final flex = child.props['flex'] as int? ?? 0;
+      if (flex > 0 && totalFlex > 0) {
+        final allocatedW = (remainingWidth * flex) / totalFlex;
+        child.performLayout(BoxConstraints(
+          minWidth: allocatedW,
+          maxWidth: allocatedW,
+          minHeight: constraints.minHeight,
+          maxHeight: constraints.maxHeight,
+        ));
+        totalWidth += child.size.width;
+        if (child.size.height > maxHeight) maxHeight = child.size.height;
+      }
+    }
+
+    double currentX = 0.0;
+    for (final child in children) {
+      child.offset = Offset(currentX, 0);
+      currentX += child.size.width;
+    }
+
+    size = constraints.constrain(Size(currentX, maxHeight));
   }
 }
 

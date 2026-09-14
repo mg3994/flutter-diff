@@ -32,6 +32,7 @@ export 'src/platform/sqlite_database.dart';
 export 'src/platform/secure_storage.dart';
 export 'src/platform/biometric_auth.dart';
 export 'src/platform/utilities.dart';
+export 'src/platform/popular_dart_utils.dart';
 export 'src/platform/location_and_audio.dart';
 export 'src/platform/connectivity.dart';
 export 'src/widgets/media_query.dart';

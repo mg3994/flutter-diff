@@ -13,6 +13,9 @@ dependencies:
   equatable: ^2.1.0
   ffi: ^2.1.0
   get_it: ^9.2.1
+  intl: ^0.20.3
+  logger: ^2.8.0
+  path: ^1.9.1
   rxdart: ^0.28.0
   signals_core: ^7.0.0
   uuid: ^4.6.0

@@ -1,7 +1,6 @@
 library flutter_zero;
 
 export 'src/accessibility/semantics.dart';
-export 'src/animation/animated_container.dart';
 export 'src/animation/animation.dart';
 export 'src/animation/curves.dart';
 export 'src/animation/keyframe.dart';
@@ -43,7 +42,7 @@ export 'src/widgets/grid.dart';
 export 'src/widgets/slivers.dart';
 export 'src/widgets/media.dart';
 export 'src/navigation/dialog.dart';
-export 'src/navigation/tab.dart';
+export 'src/navigation/tab.dart' hide BottomNavigationBar, BottomNavigationBarItem;
 export 'src/navigation/navigator.dart';
 export 'src/navigation/router.dart';
 export 'src/state/change_notifier.dart';
@@ -65,6 +64,7 @@ export 'src/widgets/gestures.dart';
 export 'src/theme/tokens.dart';
 export 'src/widgets/theme.dart';
 export 'src/widgets/widgets.dart';
+export 'src/widgets/flutter_framework_widgets.dart';
 export 'src/widgets/desktop_menus.dart';
 export 'src/widgets/native_pickers.dart';
 export 'src/widgets/enterprise_controls.dart';

@@ -1097,6 +1097,173 @@ void main() {
       expect(ZeroPath.extension('file.txt'), equals('.txt'));
       expect(ZeroPath.basename('folder/file.txt'), equals('file.txt'));
     });
+
+    test('Drawer, BottomNavigationBar, ListTile, Card, Divider, and Badge widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool navTapped = false;
+      bool listTapped = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Drawer(
+          child: Column(
+            children: [
+              Card(
+                child: ListTile(
+                  title: const Text('Title'),
+                  subtitle: const Text('Subtitle'),
+                  onTap: () => listTapped = true,
+                ),
+              ),
+              const Divider(),
+              const Badge(label: 'New', child: Text('Badged Item')),
+              BottomNavigationBar(
+                items: const [
+                  BottomNavigationBarItem(icon: Text('Home'), label: 'Home'),
+                  BottomNavigationBarItem(icon: Text('Settings'), label: 'Settings'),
+                ],
+                onTap: (idx) => navTapped = true,
+              ),
+            ],
+          ),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final drawerView = backend.views.values.firstWhere((v) => v.widgetType == 'Drawer');
+      expect(drawerView.props['elevation'], equals(16.0));
+
+      final listTileView = backend.views.values.firstWhere((v) => v.widgetType == 'ListTile');
+      backend.dispatchNativeEvent(listTileView.handle, 'tap', {});
+      expect(listTapped, isTrue);
+
+      final navBarView = backend.views.values.firstWhere((v) => v.widgetType == 'BottomNavigationBar');
+      backend.dispatchNativeEvent(navBarView.handle, 'tap', {'index': 1});
+      expect(navTapped, isTrue);
+    });
+
+    test('Radio and DropdownButton controls', () {
+      final backend = VirtualNativeUIBackend();
+      String radioVal = 'A';
+      int dropdownVal = 1;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            Radio<String>(
+              value: 'B',
+              groupValue: radioVal,
+              onChanged: (val) {
+                if (val != null) radioVal = val;
+              },
+            ),
+            DropdownButton<int>(
+              value: dropdownVal,
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Option 1')),
+                DropdownMenuItem(value: 2, child: Text('Option 2')),
+              ],
+              onChanged: (val) {
+                if (val != null) dropdownVal = val;
+              },
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final radioView = backend.views.values.firstWhere((v) => v.widgetType == 'Radio');
+      backend.dispatchNativeEvent(radioView.handle, 'click', {});
+      expect(radioVal, equals('B'));
+
+      final dropdownView = backend.views.values.firstWhere((v) => v.widgetType == 'DropdownButton');
+      backend.dispatchNativeEvent(dropdownView.handle, 'select', {'index': 1});
+      expect(dropdownVal, equals(2));
+    });
+
+    test('AnimatedContainer, AnimatedOpacity, FadeTransition, and Hero animation widgets', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: const Column(
+          children: [
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              width: 100,
+              height: 100,
+              backgroundColor: '#FF0000',
+              child: Text('Animated'),
+            ),
+            AnimatedOpacity(
+              opacity: 0.8,
+              duration: Duration(milliseconds: 200),
+              child: Text('Opaque'),
+            ),
+            FadeTransition(
+              opacity: 0.5,
+              child: Text('Faded'),
+            ),
+            Hero(
+              tag: 'hero_tag',
+              child: Text('Hero Child'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final animContainer = backend.views.values.firstWhere((v) => v.widgetType == 'AnimatedContainer');
+      expect(animContainer.props['durationMs'], equals(300));
+
+      final heroView = backend.views.values.firstWhere((v) => v.widgetType == 'Hero');
+      expect(heroView.props['tag'], equals('hero_tag'));
+    });
+
+    test('Opacity, Dismissible, and ReorderableListView visual and interaction widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool dismissed = false;
+      int reorderOld = -1;
+      int reorderNew = -1;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const Opacity(
+              opacity: 0.4,
+              child: Text('Low Opacity'),
+            ),
+            Dismissible(
+              onDismissed: () => dismissed = true,
+              child: const Text('Dismiss Me'),
+            ),
+            ReorderableListView(
+              children: const [Text('Item A'), Text('Item B')],
+              onReorder: (oldIdx, newIdx) {
+                reorderOld = oldIdx;
+                reorderNew = newIdx;
+              },
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final dismissView = backend.views.values.firstWhere((v) => v.widgetType == 'Dismissible');
+      backend.dispatchNativeEvent(dismissView.handle, 'dismiss', {});
+      expect(dismissed, isTrue);
+
+      final reorderView = backend.views.values.firstWhere((v) => v.widgetType == 'ReorderableListView');
+      backend.dispatchNativeEvent(reorderView.handle, 'reorder', {'oldIndex': 0, 'newIndex': 1});
+      expect(reorderOld, equals(0));
+      expect(reorderNew, equals(1));
+    });
   });
 }
 

@@ -74,6 +74,8 @@ export 'src/widgets/dialogs_and_pickers.dart';
 export 'src/widgets/cupertino_widgets.dart';
 export 'src/widgets/search_and_segmented.dart';
 export 'src/widgets/flow_and_stack.dart';
+export 'src/widgets/material_interactions_and_chips.dart';
+export 'src/widgets/cupertino_extended.dart';
 export 'src/widgets/desktop_menus.dart';
 export 'src/widgets/native_pickers.dart';
 export 'src/widgets/enterprise_controls.dart';

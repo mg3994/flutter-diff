@@ -1250,6 +1250,75 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('InkWell, Material, FilterChip, RangeSlider, Autocomplete, CupertinoAlertDialog, and CupertinoDatePicker widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool inkWellTapped = false;
+      bool filterChipSelected = false;
+      RangeValues? rangeVal;
+      String? autocompleteSelection;
+      DateTime? pickedDate;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            InkWell(
+              onTap: () => inkWellTapped = true,
+              child: const Text('InkWell Child'),
+            ),
+            const Material(
+              elevation: 2.0,
+              child: Text('Material Child'),
+            ),
+            FilterChip(
+              label: const Text('Filter'),
+              selected: filterChipSelected,
+              onSelected: (s) => filterChipSelected = s,
+            ),
+            RangeSlider(
+              values: const RangeValues(0.2, 0.8),
+              onChanged: (v) => rangeVal = v,
+            ),
+            Autocomplete<String>(
+              options: const ['Option A', 'Option B'],
+              onSelected: (s) => autocompleteSelection = s,
+            ),
+            const CupertinoAlertDialog(
+              title: Text('Cupertino Alert'),
+              content: Text('Alert Content'),
+            ),
+            CupertinoDatePicker(
+              initialDateTime: DateTime(2025, 1, 1),
+              onDateTimeChanged: (dt) => pickedDate = dt,
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final inkWellView = backend.views.values.firstWhere((v) => v.widgetType == 'InkWell');
+      backend.dispatchNativeEvent(inkWellView.handle, 'tap', {});
+      expect(inkWellTapped, isTrue);
+
+      final filterChipView = backend.views.values.firstWhere((v) => v.widgetType == 'FilterChip');
+      backend.dispatchNativeEvent(filterChipView.handle, 'select', {});
+      expect(filterChipSelected, isTrue);
+
+      final rangeSliderView = backend.views.values.firstWhere((v) => v.widgetType == 'RangeSlider');
+      backend.dispatchNativeEvent(rangeSliderView.handle, 'change', {'start': 0.1, 'end': 0.9});
+      expect(rangeVal?.start, equals(0.1));
+      expect(rangeVal?.end, equals(0.9));
+
+      final autocompleteView = backend.views.values.firstWhere((v) => v.widgetType == 'Autocomplete');
+      backend.dispatchNativeEvent(autocompleteView.handle, 'select', {'index': 1});
+      expect(autocompleteSelection, equals('Option B'));
+
+      final datePickerView = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoDatePicker');
+      backend.dispatchNativeEvent(datePickerView.handle, 'dateTimeChange', {'isoString': '2025-06-15T12:00:00.000'});
+      expect(pickedDate, equals(DateTime(2025, 6, 15, 12, 0, 0)));
+    });
+
     test('CupertinoButton, CupertinoSwitch, SearchBar, SegmentedButton, IndexedStack, and Transform widgets', () {
       final backend = VirtualNativeUIBackend();
       bool cupertinoBtnClicked = false;

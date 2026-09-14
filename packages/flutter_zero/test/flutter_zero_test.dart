@@ -1250,6 +1250,59 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('ElevatedCard, OutlinedCard, Tooltip, CupertinoNavigationBar, CupertinoTextField, and CheckboxFormField widgets', () {
+      final backend = VirtualNativeUIBackend();
+      String cupertinoInputText = '';
+      bool checkboxValue = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const ElevatedCard(
+              elevation: 4.0,
+              child: Text('Elevated Card'),
+            ),
+            const OutlinedCard(
+              child: Text('Outlined Card'),
+            ),
+            const Tooltip(
+              message: 'Tooltip Message',
+              child: Text('Hover Target'),
+            ),
+            const CupertinoNavigationBar(
+              leading: Text('Back'),
+              middle: Text('Title'),
+            ),
+            CupertinoTextField(
+              placeholder: 'Enter text',
+              onChanged: (txt) => cupertinoInputText = txt,
+            ),
+            CheckboxFormField(
+              value: checkboxValue,
+              onChanged: (v) => checkboxValue = v ?? false,
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final elevatedCard = backend.views.values.firstWhere((v) => v.widgetType == 'ElevatedCard');
+      expect(elevatedCard.props['elevation'], equals(4.0));
+
+      final tooltip = backend.views.values.firstWhere((v) => v.widgetType == 'Tooltip');
+      expect(tooltip.props['message'], equals('Tooltip Message'));
+
+      final cupertinoTextField = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoTextField');
+      backend.dispatchNativeEvent(cupertinoTextField.handle, 'change', {'text': 'iOS Input'});
+      expect(cupertinoInputText, equals('iOS Input'));
+
+      final checkboxFormField = backend.views.values.firstWhere((v) => v.widgetType == 'CheckboxFormField');
+      backend.dispatchNativeEvent(checkboxFormField.handle, 'change', {'value': true});
+      expect(checkboxValue, isTrue);
+    });
+
     test('NavigationBar, NavigationRail, FloatingActionButton, CupertinoActionSheet, and DropdownButtonFormField widgets', () {
       final backend = VirtualNativeUIBackend();
       int navIndex = -1;

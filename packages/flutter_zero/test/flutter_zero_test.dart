@@ -937,6 +937,45 @@ void main() {
       expect(changed, equals('assets/icon.png'));
       watcher.dispose();
     });
+
+    test('NativeStaggeredGrid layout and ZeroFormValidator validation rules', () {
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: const NativeStaggeredGrid(
+          crossAxisCount: 3,
+          children: [Text('A'), Text('B')],
+        ),
+        backend: backend,
+      );
+      app.run();
+
+      final gridView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeStaggeredGrid');
+      expect(gridView.props['crossAxisCount'], equals(3));
+
+      expect(ZeroFormValidator.required(''), equals('Field is required'));
+      expect(ZeroFormValidator.required('val'), isNull);
+      expect(ZeroFormValidator.email('invalid'), equals('Invalid email address'));
+      expect(ZeroFormValidator.email('test@example.com'), isNull);
+    });
+
+    test('ZeroWebSocketClient connection and messaging stream', () async {
+      final client = ZeroWebSocketClient(url: 'wss://echo.websocket.org');
+      await client.connect();
+
+      expect(client.isConnected, isTrue);
+
+      String? received;
+      client.messages.listen((msg) {
+        received = msg;
+      });
+
+      client.send('ping');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, equals('echo: ping'));
+      await client.close();
+      expect(client.isConnected, isFalse);
+    });
   });
 }
 

@@ -1250,6 +1250,62 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('NavigationDrawer, CarouselView, CupertinoTimerPicker, CupertinoSlidingSegmentedControl, and BackdropFilter widgets', () {
+      final backend = VirtualNativeUIBackend();
+      int drawerIndex = -1;
+      Duration? timerDuration;
+      String? segmentVal;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            NavigationDrawer(
+              onDestinationSelected: (idx) => drawerIndex = idx,
+              children: const [
+                Text('Dest 0'),
+                Text('Dest 1'),
+              ],
+            ),
+            const CarouselView(
+              itemExtent: 150,
+              children: [Text('Card A'), Text('Card B')],
+            ),
+            CupertinoTimerPicker(
+              onTimerDurationChanged: (d) => timerDuration = d,
+            ),
+            CupertinoSlidingSegmentedControl<String>(
+              groupValue: 'A',
+              children: const {'A': Text('Tab A'), 'B': Text('Tab B')},
+              onValueChanged: (v) => segmentVal = v,
+            ),
+            const BackdropFilter(
+              sigmaX: 5.0,
+              sigmaY: 5.0,
+              child: Text('Blurred'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final drawer = backend.views.values.firstWhere((v) => v.widgetType == 'NavigationDrawer');
+      backend.dispatchNativeEvent(drawer.handle, 'select', {'index': 1});
+      expect(drawerIndex, equals(1));
+
+      final timerPicker = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoTimerPicker');
+      backend.dispatchNativeEvent(timerPicker.handle, 'durationChange', {'durationMs': 60000});
+      expect(timerDuration, equals(const Duration(minutes: 1)));
+
+      final segmented = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoSlidingSegmentedControl');
+      backend.dispatchNativeEvent(segmented.handle, 'select', {'index': 1});
+      expect(segmentVal, equals('B'));
+
+      final filter = backend.views.values.firstWhere((v) => v.widgetType == 'BackdropFilter');
+      expect(filter.props['sigmaX'], equals(5.0));
+    });
+
     test('MouseRegion, Listener, SliverFillRemaining, RichText, and SelectableText widgets', () {
       final backend = VirtualNativeUIBackend();
       bool mouseEntered = false;

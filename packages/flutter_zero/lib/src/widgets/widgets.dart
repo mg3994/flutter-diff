@@ -1,7 +1,6 @@
 import '../core/element.dart';
 import '../core/render_node.dart';
 import '../core/widget.dart';
-import '../theme/style.dart';
 import 'theme.dart';
 
 abstract class NativeRenderWidget extends Widget {
@@ -133,14 +132,12 @@ class Text extends NativeRenderWidget {
   final String text;
   final double? fontSize;
   final String? color;
-  final TextStyle? style;
 
   const Text(
     this.text, {
     super.key,
     this.fontSize,
     this.color,
-    this.style,
   });
 
   @override
@@ -148,14 +145,11 @@ class Text extends NativeRenderWidget {
 
   @override
   NativeRenderNode createRenderNode() {
-    final double? effFontSize = style?.fontSize ?? fontSize;
-    final String? effColor = style?.color?.toHex() ?? color;
-
     return TextRenderNode(
       props: {
         'text': text,
-        'fontSize': effFontSize,
-        'color': effColor,
+        'fontSize': fontSize,
+        'color': color,
       },
     );
   }
@@ -177,11 +171,8 @@ class TextElement extends NativeRenderElement {
     final textWidget = widget;
     final theme = Theme.of(this);
 
-    final double? styleFontSize = textWidget.style?.fontSize;
-    final String? styleColor = textWidget.style?.color?.toHex();
-
-    renderNode?.props['color'] = styleColor ?? textWidget.color ?? theme.primaryColor;
-    renderNode?.props['fontSize'] = styleFontSize ?? textWidget.fontSize ?? theme.defaultFontSize;
+    renderNode?.props['color'] = textWidget.color ?? theme.primaryColor;
+    renderNode?.props['fontSize'] = textWidget.fontSize ?? theme.defaultFontSize;
   }
 
   @override
@@ -364,27 +355,21 @@ class TextFieldRenderNode extends NativeRenderNode {
 }
 
 class Padding extends NativeRenderWidget {
-  final EdgeInsets padding;
+  final double padding;
   final Widget child;
 
-  Padding({
+  const Padding({
     super.key,
-    dynamic padding,
+    required this.padding,
     required this.child,
-  }) : padding = padding is EdgeInsets ? padding : EdgeInsets.all((padding as num?)?.toDouble() ?? 0.0);
+  });
 
   @override
   Element createElement() => PaddingElement(this);
 
   @override
   NativeRenderNode createRenderNode() {
-    return PaddingRenderNode(props: {
-      'padding': padding.top,
-      'paddingTop': padding.top,
-      'paddingLeft': padding.left,
-      'paddingRight': padding.right,
-      'paddingBottom': padding.bottom,
-    });
+    return PaddingRenderNode(props: {'padding': padding});
   }
 }
 
@@ -393,31 +378,26 @@ class PaddingRenderNode extends SingleChildNativeRenderNode {
 
   @override
   void performLayout(BoxConstraints constraints) {
-    final double pTop = (props['paddingTop'] as num?)?.toDouble() ?? 0.0;
-    final double pLeft = (props['paddingLeft'] as num?)?.toDouble() ?? 0.0;
-    final double pRight = (props['paddingRight'] as num?)?.toDouble() ?? 0.0;
-    final double pBottom = (props['paddingBottom'] as num?)?.toDouble() ?? 0.0;
-
-    final double horizontalP = pLeft + pRight;
-    final double verticalP = pTop + pBottom;
+    final double p = (props['padding'] as num?)?.toDouble() ?? 0.0;
+    final double doubleP = p * 2;
 
     final childConstraints = BoxConstraints(
-      minWidth: (constraints.minWidth - horizontalP).clamp(0.0, double.infinity),
-      maxWidth: (constraints.maxWidth - horizontalP).clamp(0.0, double.infinity),
-      minHeight: (constraints.minHeight - verticalP).clamp(0.0, double.infinity),
-      maxHeight: (constraints.maxHeight - verticalP).clamp(0.0, double.infinity),
+      minWidth: (constraints.minWidth - doubleP).clamp(0.0, double.infinity),
+      maxWidth: (constraints.maxWidth - doubleP).clamp(0.0, double.infinity),
+      minHeight: (constraints.minHeight - doubleP).clamp(0.0, double.infinity),
+      maxHeight: (constraints.maxHeight - doubleP).clamp(0.0, double.infinity),
     );
 
     final currentChild = child;
     if (currentChild != null) {
       currentChild.performLayout(childConstraints);
-      currentChild.offset = Offset(pLeft, pTop);
+      currentChild.offset = Offset(p, p);
       size = constraints.constrain(Size(
-        currentChild.size.width + horizontalP,
-        currentChild.size.height + verticalP,
+        currentChild.size.width + doubleP,
+        currentChild.size.height + doubleP,
       ));
     } else {
-      size = constraints.constrain(Size(horizontalP, verticalP));
+      size = constraints.constrain(Size(doubleP, doubleP));
     }
   }
 }
@@ -1098,8 +1078,6 @@ class StackElement extends NativeRenderElement {
           el.renderNode!.props['left'] = w.left;
           el.renderNode!.props['right'] = w.right;
           el.renderNode!.props['bottom'] = w.bottom;
-          el.renderNode!.props['width'] = w.width;
-          el.renderNode!.props['height'] = w.height;
         }
         multiNode.addChild(el.renderNode!);
       }
@@ -1157,8 +1135,6 @@ class StackElement extends NativeRenderElement {
           el.renderNode!.props['left'] = w.left;
           el.renderNode!.props['right'] = w.right;
           el.renderNode!.props['bottom'] = w.bottom;
-          el.renderNode!.props['width'] = w.width;
-          el.renderNode!.props['height'] = w.height;
         }
         multiNode.addChild(el.renderNode!);
       }

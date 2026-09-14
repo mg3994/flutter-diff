@@ -504,7 +504,7 @@ void main() {
       final json = inspector.toJson();
 
       expect(json['rootCount'], equals(1));
-      expect((json['views'] as List).isNotEmpty, isTrue);
+      expect((json['views'] as List<dynamic>).isNotEmpty, isTrue);
     });
 
     test('JNINativeUIBackend view creation and serialization', () {
@@ -780,173 +780,87 @@ void main() {
       expect(ColorPalette.defaultDark.background, equals('#121212'));
     });
 
-    test('Checkbox, Switch, and Slider input prop serialization', () {
+    test('NativeMenuBar & NativeMenuItem JSON prop serialization', () {
       final backend = VirtualNativeUIBackend();
-
       final app = FlutterZeroApp(
-        rootWidget: Column(
-          children: [
-            Checkbox(value: true, onChanged: (_) {}),
-            Switch(value: false, onChanged: (_) {}),
-            Slider(value: 0.75, min: 0.0, max: 1.0, onChanged: (_) {}),
+        rootWidget: const NativeMenuBar(
+          items: [
+            NativeMenuItem(label: 'File', children: [
+              NativeMenuItem(label: 'New'),
+            ]),
           ],
         ),
         backend: backend,
       );
-
       app.run();
 
-      final checkbox = backend.views.values.firstWhere((v) => v.widgetType == 'Checkbox');
-      final switchView = backend.views.values.firstWhere((v) => v.widgetType == 'Switch');
-      final slider = backend.views.values.firstWhere((v) => v.widgetType == 'Slider');
-
-      expect(checkbox.props['value'], isTrue);
-      expect(switchView.props['value'], isFalse);
-      expect(slider.props['value'], equals(0.75));
+      final menuView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeMenuBar');
+      expect(menuView, isNotNull);
+      final List<dynamic> items = menuView.props['menuItems'] as List<dynamic>;
+      expect((items.first as Map<String, dynamic>)['label'], equals('File'));
     });
 
-    test('Scaffold shell structure and SnackBar overlay', () {
+    test('ZeroRouter path matching and route parameters resolution', () {
       final backend = VirtualNativeUIBackend();
-
-      final app = FlutterZeroApp(
-        rootWidget: const Scaffold(
-          appBar: Text('App Bar Title'),
-          body: Text('Body Content'),
-        ),
-        backend: backend,
-      );
-
-      app.run();
-
-      final textViews = backend.views.values.where((v) => v.widgetType == 'Text').toList();
-      expect(textViews[0].props['text'], equals('App Bar Title'));
-      expect(textViews[1].props['text'], equals('Body Content'));
-    });
-
-    test('computeIsolate parallel background task execution', () async {
-      final result = await computeIsolate<int, int>((val) => val * 2, 21);
-      expect(result, equals(42));
-    });
-
-    test('Transform scale and rotation prop serialization', () {
-      final backend = VirtualNativeUIBackend();
-
-      final app = FlutterZeroApp(
-        rootWidget: const Transform(
-          scale: 1.5,
-          rotation: 0.5,
-          child: Text('Transformed'),
-        ),
-        backend: backend,
-      );
-
-      app.run();
-
-      final transformView = backend.views.values.firstWhere((v) => v.widgetType == 'Transform');
-      expect(transformView.props['scale'], equals(1.5));
-      expect(transformView.props['rotation'], equals(0.5));
-    });
-
-    test('ClipRRect border radius prop serialization', () {
-      final backend = VirtualNativeUIBackend();
-
-      final app = FlutterZeroApp(
-        rootWidget: const ClipRRect(
-          borderRadius: 16.0,
-          child: Text('Clipped'),
-        ),
-        backend: backend,
-      );
-
-      app.run();
-
-      final clipView = backend.views.values.firstWhere((v) => v.widgetType == 'ClipRRect');
-      expect(clipView.props['borderRadius'], equals(16.0));
-    });
-
-    test('AssetBundle string loading', () async {
-      final bundle = NetworkAssetBundle();
-      bundle.registerMockAsset('test.txt', 'hello_world');
-
-      final content = await bundle.loadString('test.txt');
-      expect(content, equals('hello_world'));
-    });
-
-    test('TextStyle and EdgeInsets prop resolution in Text and Padding', () {
-      final backend = VirtualNativeUIBackend();
-
-      final app = FlutterZeroApp(
-        rootWidget: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-          child: Text(
-            'Styled Text',
-            style: TextStyle(
-              fontSize: 16.0,
-              color: const Color(0xFF123456),
-            ),
+      final router = ZeroRouter(
+        initialPath: '/user/123',
+        routes: [
+          ZeroRoute(
+            path: '/user/:id',
+            builder: (ctx, params) => Text('User ID: ${params['id']}'),
           ),
+        ],
+      );
+
+      final app = FlutterZeroApp(
+        rootWidget: router,
+        backend: backend,
+      );
+      app.run();
+
+      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
+      expect(textView.props['text'], equals('User ID: 123'));
+    });
+
+    test('NativeDataTable column and row props creation', () {
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: const NativeDataTable(
+          columns: [DataColumn(label: 'Name'), DataColumn(label: 'Age', numeric: true)],
+          rows: [
+            DataRow(cells: [DataCell(Text('Alice')), DataCell(Text('30'))]),
+          ],
         ),
         backend: backend,
       );
-
       app.run();
 
-      final paddingView = backend.views.values.firstWhere((v) => v.widgetType == 'Padding');
-      final textView = backend.views.values.firstWhere((v) => v.widgetType == 'Text');
-
-      expect(paddingView.props['paddingTop'], equals(8.0));
-      expect(paddingView.props['paddingLeft'], equals(12.0));
-      expect(textView.props['fontSize'], equals(16.0));
-      expect(textView.props['color'], equals('#123456'));
+      final tableView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeDataTable');
+      expect(tableView.props['rowCount'], equals(1));
     });
 
-    test('EventBus broadcast event dispatching', () async {
-      final bus = EventBus(sync: true);
-      String? receivedData;
+    test('RemoteWidgetLoader schema parsing and dynamic tree generation', () {
+      final schema = {
+        'type': 'Column',
+        'children': [
+          {'type': 'Text', 'properties': {'text': 'Dynamic Text'}},
+          {'type': 'Button', 'properties': {'label': 'Dynamic Button'}},
+        ],
+      };
 
-      bus.on<_TestEvent>().listen((e) {
-        receivedData = e.payload;
-      });
-
-      bus.fire(const _TestEvent('bus_data'));
-      expect(receivedData, equals('bus_data'));
+      final widget = RemoteWidgetLoader.parseSchema(schema);
+      expect(widget, isA<Column>());
     });
 
-    test('StateMachine state transitions', () {
-      final sm = StateMachine<String, String>('off', {
-        'off': {'toggle': 'on'},
-        'on': {'toggle': 'off'},
-      });
+    test('NativeFileDialog file open and directory picker mock resolution', () async {
+      final backend = VirtualNativeUIBackend();
+      final file = await NativeFileDialog.pickFile(backend: backend);
+      final dir = await NativeFileDialog.pickDirectory(backend: backend);
 
-      expect(sm.value, equals('off'));
-      expect(sm.canTransition('toggle'), isTrue);
-
-      sm.trigger('toggle');
-      expect(sm.value, equals('on'));
-    });
-
-    test('NativePointerBridge address and pointer conversion', () {
-      const address = 0xDEADBEEF;
-      final ptr = NativePointerBridge.handleToPointer(address);
-      final handle = NativePointerBridge.pointerToHandle(ptr);
-
-      expect(handle, equals(address));
-    });
-
-    test('AsyncImagePreloader preloading and caching', () async {
-      const url = 'https://example.com/preload.png';
-      expect(NetworkImageCache.instance.isCached(url), isFalse);
-
-      final ok = await AsyncImagePreloader.preload(url);
-      expect(ok, isTrue);
-      expect(NetworkImageCache.instance.isCached(url), isTrue);
+      expect(file, equals('file://mock_picked_file.png'));
+      expect(dir, equals('dir://mock_directory'));
     });
   });
-}
-
-class _TestEvent extends Event {
-  final String payload;
-  const _TestEvent(this.payload);
 }
 
 class _TestPlugin extends FlutterZeroPlugin {

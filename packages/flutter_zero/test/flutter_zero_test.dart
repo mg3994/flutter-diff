@@ -1250,6 +1250,73 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('NavigationBar, NavigationRail, FloatingActionButton, CupertinoActionSheet, and DropdownButtonFormField widgets', () {
+      final backend = VirtualNativeUIBackend();
+      int navIndex = -1;
+      bool fabClicked = false;
+      bool actionClicked = false;
+      int? dropdownVal;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            NavigationBar(
+              selectedIndex: 0,
+              onDestinationSelected: (idx) => navIndex = idx,
+              destinations: const [Text('Home'), Text('Search')],
+            ),
+            NavigationRail(
+              selectedIndex: 0,
+              onDestinationSelected: (idx) => navIndex = idx,
+              destinations: const [
+                NavigationRailDestination(icon: Text('Icon'), label: Text('Rail Label')),
+              ],
+            ),
+            FloatingActionButton(
+              onPressed: () => fabClicked = true,
+              child: const Text('+'),
+            ),
+            CupertinoActionSheet(
+              title: const Text('Sheet Title'),
+              actions: [
+                CupertinoActionSheetAction(
+                  onPressed: () => actionClicked = true,
+                  child: const Text('Sheet Action'),
+                ),
+              ],
+            ),
+            DropdownButtonFormField<int>(
+              value: 1,
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Item 1')),
+                DropdownMenuItem(value: 2, child: Text('Item 2')),
+              ],
+              onChanged: (v) => dropdownVal = v,
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final navBar = backend.views.values.firstWhere((v) => v.widgetType == 'NavigationBar');
+      backend.dispatchNativeEvent(navBar.handle, 'select', {'index': 1});
+      expect(navIndex, equals(1));
+
+      final fab = backend.views.values.firstWhere((v) => v.widgetType == 'FloatingActionButton');
+      backend.dispatchNativeEvent(fab.handle, 'click', {});
+      expect(fabClicked, isTrue);
+
+      final sheetAction = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoActionSheetAction');
+      backend.dispatchNativeEvent(sheetAction.handle, 'click', {});
+      expect(actionClicked, isTrue);
+
+      final dropdownFormField = backend.views.values.firstWhere((v) => v.widgetType == 'DropdownButtonFormField');
+      backend.dispatchNativeEvent(dropdownFormField.handle, 'select', {'index': 1});
+      expect(dropdownVal, equals(2));
+    });
+
     test('NavigationDrawer, CarouselView, CupertinoTimerPicker, CupertinoSlidingSegmentedControl, and BackdropFilter widgets', () {
       final backend = VirtualNativeUIBackend();
       int drawerIndex = -1;

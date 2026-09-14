@@ -1025,7 +1025,42 @@ void main() {
       final m2 = _TestModel('A', 10);
       expect(m1, equals(m2));
     });
+
+    test('BlocBuilder reactivity, NativeChartWidget, NativePdfViewer, ZeroLocationService and NativeAudioRecorder', () async {
+      final cubit = _TestCubit();
+      expect(cubit.state, equals(0));
+
+      cubit.increment();
+      expect(cubit.state, equals(1));
+
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const NativeChartWidget(chartType: 'bar', dataPoints: [{'x': 1, 'y': 10}]),
+            const NativePdfViewer(documentPath: '/tmp/sample.pdf'),
+            const NativeAudioRecorder(),
+          ],
+        ),
+        backend: backend,
+      );
+      app.run();
+
+      final chartView = backend.views.values.firstWhere((v) => v.widgetType == 'NativeChart');
+      expect(chartView.props['chartType'], equals('bar'));
+
+      expect(await ZeroLocationService.isLocationPermissionGranted(), isTrue);
+      final loc = await ZeroLocationService.getCurrentLocation();
+      expect(loc.latitude, equals(37.7749));
+
+      await cubit.close();
+    });
   });
+}
+
+class _TestCubit extends Cubit<int> {
+  _TestCubit() : super(0);
+  void increment() => emit(state + 1);
 }
 
 class _TestModel extends ZeroModel {

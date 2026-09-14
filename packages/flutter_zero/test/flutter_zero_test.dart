@@ -860,6 +860,42 @@ void main() {
       expect(file, equals('file://mock_picked_file.png'));
       expect(dir, equals('dir://mock_directory'));
     });
+
+    test('signals_core Signal, computed, and effect reactive dependency tracking', () {
+      final count = signal<int>(10);
+      final doubleCount = computed<int>(() => count.value * 2);
+
+      int observed = 0;
+      effect(() {
+        observed = doubleCount.value;
+      });
+
+      expect(observed, equals(20));
+
+      count.value = 25;
+      expect(observed, equals(50));
+    });
+
+    test('NativeClipboard copy and paste', () async {
+      await NativeClipboard.setData('Copied Content');
+      final text = await NativeClipboard.getData();
+
+      expect(text, equals('Copied Content'));
+    });
+
+    test('NativeDevToolsServer tree serialization', () {
+      final backend = VirtualNativeUIBackend();
+      final server = NativeDevToolsServer(backend: backend);
+
+      server.start(port: 9090);
+      expect(server.isRunning, isTrue);
+
+      final treeJson = server.getSerializedRenderTree();
+      expect(treeJson.contains('rootCount'), isTrue);
+
+      server.stop();
+      expect(server.isRunning, isFalse);
+    });
   });
 }
 

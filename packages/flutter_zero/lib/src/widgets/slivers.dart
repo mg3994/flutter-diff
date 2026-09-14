@@ -130,6 +130,164 @@ class SliverListElement extends NativeRenderElement {
   }
 }
 
+class SliverGrid extends SliverWidget {
+  final List<Widget> children;
+  final int crossAxisCount;
+
+  const SliverGrid({
+    super.key,
+    this.children = const [],
+    this.crossAxisCount = 2,
+  });
+
+  @override
+  Element createElement() => SliverGridElement(this);
+
+  @override
+  NativeRenderNode createRenderNode() {
+    return SingleChildNativeRenderNode(
+      widgetType: 'SliverGrid',
+      props: {'crossAxisCount': crossAxisCount},
+    );
+  }
+}
+
+class SliverGridElement extends NativeRenderElement {
+  List<Element> _childElements = [];
+
+  SliverGridElement(SliverGrid super.widget);
+
+  @override
+  SliverGrid get widget => super.widget as SliverGrid;
+
+  @override
+  void mount(Element? parent) {
+    super.mount(parent);
+    _childElements = widget.children.map((w) {
+      final el = w.createElement();
+      el.mount(this);
+      return el;
+    }).toList();
+  }
+
+  @override
+  void unmount() {
+    for (final el in _childElements) {
+      el.unmount();
+    }
+    _childElements.clear();
+    super.unmount();
+  }
+
+  @override
+  void visitChildren(void Function(Element element) visitor) {
+    for (final el in _childElements) {
+      visitor(el);
+    }
+  }
+}
+
+class SliverToBoxAdapter extends SliverWidget {
+  final Widget? child;
+
+  const SliverToBoxAdapter({
+    super.key,
+    this.child,
+  });
+
+  @override
+  Element createElement() => SliverToBoxAdapterElement(this);
+
+  @override
+  NativeRenderNode createRenderNode() {
+    return SingleChildNativeRenderNode(widgetType: 'SliverToBoxAdapter');
+  }
+}
+
+class SliverToBoxAdapterElement extends NativeRenderElement {
+  Element? _childElement;
+
+  SliverToBoxAdapterElement(SliverToBoxAdapter super.widget);
+
+  @override
+  SliverToBoxAdapter get widget => super.widget as SliverToBoxAdapter;
+
+  @override
+  void mount(Element? parent) {
+    super.mount(parent);
+    if (widget.child != null) {
+      _childElement = widget.child!.createElement();
+      _childElement!.mount(this);
+    }
+  }
+
+  @override
+  void unmount() {
+    _childElement?.unmount();
+    _childElement = null;
+    super.unmount();
+  }
+
+  @override
+  void visitChildren(void Function(Element element) visitor) {
+    if (_childElement != null) visitor(_childElement!);
+  }
+}
+
+class SliverAppBar extends SliverWidget {
+  final Widget? title;
+  final bool pinned;
+  final bool expanded;
+
+  const SliverAppBar({
+    super.key,
+    this.title,
+    this.pinned = false,
+    this.expanded = false,
+  });
+
+  @override
+  Element createElement() => SliverAppBarElement(this);
+
+  @override
+  NativeRenderNode createRenderNode() {
+    return SingleChildNativeRenderNode(
+      widgetType: 'SliverAppBar',
+      props: {'pinned': pinned, 'expanded': expanded},
+    );
+  }
+}
+
+class SliverAppBarElement extends NativeRenderElement {
+  Element? _titleElement;
+
+  SliverAppBarElement(SliverAppBar super.widget);
+
+  @override
+  SliverAppBar get widget => super.widget as SliverAppBar;
+
+  @override
+  void mount(Element? parent) {
+    super.mount(parent);
+    if (widget.title != null) {
+      _titleElement = widget.title!.createElement();
+      _titleElement!.mount(this);
+    }
+  }
+
+  @override
+  void unmount() {
+    _titleElement?.unmount();
+    _titleElement = null;
+    super.unmount();
+  }
+
+  @override
+  void visitChildren(void Function(Element element) visitor) {
+    if (_titleElement != null) visitor(_titleElement!);
+  }
+}
+
 class CustomScrollView extends NativeRenderWidget {
   final List<Widget> slivers;
 

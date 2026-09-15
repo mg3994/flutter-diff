@@ -1250,6 +1250,53 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('NavigationDrawerDestination, CupertinoListTile, CupertinoListSection, and RadioFormField widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool listTileTapped = false;
+      String radioFormVal = 'A';
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const NavigationDrawerDestination(
+              icon: Text('Icon'),
+              label: Text('Label'),
+            ),
+            CupertinoListSection(
+              header: const Text('Section Header'),
+              children: [
+                CupertinoListTile(
+                  title: const Text('Tile Title'),
+                  onTap: () => listTileTapped = true,
+                ),
+              ],
+            ),
+            RadioFormField<String>(
+              value: 'B',
+              groupValue: radioFormVal,
+              onChanged: (v) {
+                if (v != null) radioFormVal = v;
+              },
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final drawerDest = backend.views.values.firstWhere((v) => v.widgetType == 'NavigationDrawerDestination');
+      expect(drawerDest, isNotNull);
+
+      final listTile = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoListTile');
+      backend.dispatchNativeEvent(listTile.handle, 'tap', {});
+      expect(listTileTapped, isTrue);
+
+      final radioFormField = backend.views.values.firstWhere((v) => v.widgetType == 'RadioFormField');
+      backend.dispatchNativeEvent(radioFormField.handle, 'click', {});
+      expect(radioFormVal, equals('B'));
+    });
+
     test('FloatingActionButtonExtended, CupertinoTabScaffold, and SwitchFormField widgets', () {
       final backend = VirtualNativeUIBackend();
       bool fabClicked = false;

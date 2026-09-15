@@ -100,6 +100,8 @@ export 'src/widgets/form_fields_validation.dart';
 export 'src/widgets/material3_navigation_advanced.dart';
 export 'src/widgets/cupertino_advanced_menus.dart';
 export 'src/widgets/form_fields_persistence.dart';
+export 'src/widgets/search_extended.dart';
+export 'src/widgets/cupertino_pickers_extended.dart';
 export 'src/widgets/desktop_menus.dart';
 export 'src/widgets/native_pickers.dart';
 export 'src/widgets/enterprise_controls.dart';

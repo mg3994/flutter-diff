@@ -1250,6 +1250,37 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('SearchAnchor and CupertinoPicker widgets', () {
+      final backend = VirtualNativeUIBackend();
+      int selectedPickerIndex = -1;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            SearchAnchor(
+              builder: (ctx) => const Text('Search Button'),
+              suggestionsBuilder: (ctx, q) => [const Text('Suggestion 1')],
+            ),
+            CupertinoPicker(
+              itemExtent: 32.0,
+              onSelectedItemChanged: (idx) => selectedPickerIndex = idx,
+              children: const [Text('Option 1'), Text('Option 2')],
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final searchAnchor = backend.views.values.firstWhere((v) => v.widgetType == 'SearchAnchor');
+      expect(searchAnchor, isNotNull);
+
+      final picker = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoPicker');
+      backend.dispatchNativeEvent(picker.handle, 'select', {'index': 1});
+      expect(selectedPickerIndex, equals(1));
+    });
+
     test('NavigationDrawerDestination, CupertinoListTile, CupertinoListSection, and RadioFormField widgets', () {
       final backend = VirtualNativeUIBackend();
       bool listTileTapped = false;

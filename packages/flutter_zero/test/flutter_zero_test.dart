@@ -1250,6 +1250,50 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('MenuAnchor, CupertinoSliverRefreshControl, and PaginatedDataTable widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool menuItemClicked = false;
+      bool refreshTriggered = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            MenuAnchor(
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () => menuItemClicked = true,
+                  child: const Text('Menu Item 1'),
+                ),
+              ],
+              child: const Text('Open Menu'),
+            ),
+            CupertinoSliverRefreshControl(
+              onRefresh: () async => refreshTriggered = true,
+            ),
+            PaginatedDataTable(
+              header: const Text('Data Header'),
+              columns: const [DataColumn(label: 'Col 1')],
+              source: _TestTableSource(),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final menuItem = backend.views.values.firstWhere((v) => v.widgetType == 'MenuItemButton');
+      backend.dispatchNativeEvent(menuItem.handle, 'click', {});
+      expect(menuItemClicked, isTrue);
+
+      final refreshControl = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoSliverRefreshControl');
+      backend.dispatchNativeEvent(refreshControl.handle, 'refresh', {});
+      expect(refreshTriggered, isTrue);
+
+      final paginatedTable = backend.views.values.firstWhere((v) => v.widgetType == 'PaginatedDataTable');
+      expect(paginatedTable.props['columnCount'], equals(1));
+    });
+
     test('SearchAnchor and CupertinoPicker widgets', () {
       final backend = VirtualNativeUIBackend();
       int selectedPickerIndex = -1;
@@ -2068,6 +2112,17 @@ class _TestStatefulWidget extends StatefulWidget {
 
   @override
   State<_TestStatefulWidget> createState() => _TestStatefulWidgetState();
+}
+
+class _TestTableSource extends DataTableSource {
+  @override
+  DataRow? getRow(int index) => DataRow(cells: [DataCell(Text('Row $index'))]);
+
+  @override
+  int get rowCount => 10;
+
+  @override
+  bool get isRowCountApproximate => false;
 }
 
 class _TestStatefulWidgetState extends State<_TestStatefulWidget> {

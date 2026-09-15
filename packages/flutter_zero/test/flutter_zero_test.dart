@@ -1250,6 +1250,49 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('FittedBox, AspectRatio, Spacer, AnimatedSwitcher, and FocusScope widgets', () {
+      final backend = VirtualNativeUIBackend();
+      final focusNode = FocusScopeNode();
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const FittedBox(
+              child: Text('Fitted Content'),
+            ),
+            const AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Text('16:9 Aspect'),
+            ),
+            const Spacer(),
+            const AnimatedSwitcher(
+              duration: Duration(milliseconds: 250),
+              child: Text('Switched'),
+            ),
+            FocusScope(
+              node: focusNode,
+              child: const Text('Focused Area'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final fittedBox = backend.views.values.firstWhere((v) => v.widgetType == 'FittedBox');
+      expect(fittedBox, isNotNull);
+
+      final aspectRatio = backend.views.values.firstWhere((v) => v.widgetType == 'AspectRatio');
+      expect(aspectRatio.props['aspectRatio'], equals(16 / 9));
+
+      final animSwitcher = backend.views.values.firstWhere((v) => v.widgetType == 'AnimatedSwitcher');
+      expect(animSwitcher.props['durationMs'], equals(250));
+
+      focusNode.requestFocus();
+      expect(focusNode.hasFocus, isTrue);
+    });
+
     test('MenuAnchor, CupertinoSliverRefreshControl, and PaginatedDataTable widgets', () {
       final backend = VirtualNativeUIBackend();
       bool menuItemClicked = false;

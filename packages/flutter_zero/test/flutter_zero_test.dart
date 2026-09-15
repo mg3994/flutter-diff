@@ -1250,6 +1250,46 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('FloatingActionButtonExtended, CupertinoTabScaffold, and SwitchFormField widgets', () {
+      final backend = VirtualNativeUIBackend();
+      bool fabClicked = false;
+      bool switchVal = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            FloatingActionButtonExtended(
+              icon: const Text('+'),
+              label: const Text('Add Item'),
+              onPressed: () => fabClicked = true,
+            ),
+            CupertinoTabScaffold(
+              tabBar: const Text('Tab Bar'),
+              tabBuilder: (ctx, idx) => Text('Tab Body $idx'),
+            ),
+            SwitchFormField(
+              value: switchVal,
+              onChanged: (v) => switchVal = v,
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final fabExt = backend.views.values.firstWhere((v) => v.widgetType == 'FloatingActionButtonExtended');
+      backend.dispatchNativeEvent(fabExt.handle, 'click', {});
+      expect(fabClicked, isTrue);
+
+      final tabScaffold = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoTabScaffold');
+      expect(tabScaffold, isNotNull);
+
+      final switchFormField = backend.views.values.firstWhere((v) => v.widgetType == 'SwitchFormField');
+      backend.dispatchNativeEvent(switchFormField.handle, 'change', {'value': true});
+      expect(switchVal, isTrue);
+    });
+
     test('InputChip, RawChip, CupertinoPopupSurface, and CalendarDatePicker widgets', () {
       final backend = VirtualNativeUIBackend();
       bool chipClicked = false;

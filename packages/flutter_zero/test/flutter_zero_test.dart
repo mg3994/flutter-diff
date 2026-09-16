@@ -1250,6 +1250,20 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('DartNativeSDKInfo, DartNativeAssetRegistry, and DartNativeBridge resolution', () {
+      const sdkInfo = DartNativeSDKInfo();
+      expect(sdkInfo.sdkVersion, equals('1.0.0-dn'));
+      expect(sdkInfo.zeroTelemetry, isTrue);
+
+      DartNativeAssetRegistry.registerAsset('native_lib', 'lib/libnative_lib.so');
+      expect(DartNativeAssetRegistry.isRegistered('native_lib'), isTrue);
+      expect(DartNativeAssetRegistry.getAssetPath('native_lib'), equals('lib/libnative_lib.so'));
+
+      final bridge = DartNativeBridge();
+      final url = bridge.resolveCdnAssetUrl('assets/image.png');
+      expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
+    });
+
     test('Material3Badge.count, CupertinoPageRoute, and FormField widgets', () {
       final backend = VirtualNativeUIBackend();
 

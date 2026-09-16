@@ -132,3 +132,4 @@ export 'src/assets/asset_bundle.dart';
 export 'src/async/isolate.dart';
 export 'src/event/event_bus.dart';
 export 'src/state/state_machine.dart';
+export 'src/platform/dartnative_bridge.dart';

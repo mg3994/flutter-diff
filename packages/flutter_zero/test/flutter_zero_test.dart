@@ -1264,6 +1264,37 @@ void main() {
       expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
     });
 
+    test('BadgeCount, CupertinoListSectionInsetGrouped, and RestorableTextEditingController', () {
+      final backend = VirtualNativeUIBackend();
+      final controller = RestorableTextEditingController(value: 'Restored');
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const BadgeCount(
+              count: 99,
+              child: Text('Icon Badge'),
+            ),
+            const CupertinoListSectionInsetGrouped(
+              header: Text('Inset Grouped Header'),
+              children: [Text('Child Item')],
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final badgeCount = backend.views.values.firstWhere((v) => v.widgetType == 'BadgeCount');
+      expect(badgeCount.props['count'], equals(99));
+
+      final insetGrouped = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoListSectionInsetGrouped');
+      expect(insetGrouped, isNotNull);
+
+      expect(controller.value, equals('Restored'));
+    });
+
     test('FastList, FastGrid, MasonryFastGrid, Provided, signal.watch, and dnLog features', () async {
       final backend = VirtualNativeUIBackend();
       final countSignal = signal<int>(42);

@@ -136,3 +136,6 @@ export 'src/platform/dartnative_bridge.dart';
 export 'src/widgets/fast_list.dart';
 export 'src/platform/native_dialogs.dart';
 export 'src/platform/logging.dart';
+export 'src/widgets/material3_navigation_extended_v2.dart';
+export 'src/widgets/cupertino_advanced_menus_v2.dart';
+export 'src/widgets/form_fields_persistence_v2.dart';

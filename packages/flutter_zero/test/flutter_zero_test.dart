@@ -1250,6 +1250,40 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('Overlay, OverlayEntry, SliverLayoutBuilder, and SecondaryTabBar widgets', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            Overlay(
+              initialEntries: [
+                OverlayEntry(builder: (ctx) => const Text('Overlay Entry Child')),
+              ],
+            ),
+            SliverLayoutBuilder(
+              builder: (ctx, constraints) => const Text('Sliver Layout Child'),
+            ),
+            const SecondaryTabBar(
+              tabs: [Text('Sec Tab 1'), Text('Sec Tab 2')],
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final overlay = backend.views.values.firstWhere((v) => v.widgetType == 'Overlay');
+      expect(overlay, isNotNull);
+
+      final sliverLayoutBuilder = backend.views.values.firstWhere((v) => v.widgetType == 'SliverLayoutBuilder');
+      expect(sliverLayoutBuilder, isNotNull);
+
+      final secTabBar = backend.views.values.firstWhere((v) => v.widgetType == 'SecondaryTabBar');
+      expect(secTabBar, isNotNull);
+    });
+
     test('DecoratedBox, ColoredBox, SlideTransition, LayoutBuilder, and OrientationBuilder widgets', () {
       final backend = VirtualNativeUIBackend();
 

@@ -1250,6 +1250,50 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('DecoratedBox, ColoredBox, SlideTransition, LayoutBuilder, and OrientationBuilder widgets', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                color: '#0000FF',
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Text('Decorated'),
+            ),
+            const ColoredBox(
+              color: '#FF00FF',
+              child: Text('Colored'),
+            ),
+            const SlideTransition(
+              position: Offset(10, 20),
+              child: Text('Slid'),
+            ),
+            LayoutBuilder(
+              builder: (ctx, constraints) => Text('MaxW: ${constraints.maxWidth}'),
+            ),
+            OrientationBuilder(
+              builder: (ctx, orientation) => Text('Orientation: ${orientation.name}'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final decoratedBox = backend.views.values.firstWhere((v) => v.widgetType == 'DecoratedBox');
+      expect(decoratedBox.props['decoration'], isNotNull);
+
+      final coloredBox = backend.views.values.firstWhere((v) => v.widgetType == 'ColoredBox');
+      expect(coloredBox.props['color'], equals('#FF00FF'));
+
+      final slideTransition = backend.views.values.firstWhere((v) => v.widgetType == 'SlideTransition');
+      expect(slideTransition.props['dx'], equals(10.0));
+    });
+
     test('FittedBox, AspectRatio, Spacer, AnimatedSwitcher, and FocusScope widgets', () {
       final backend = VirtualNativeUIBackend();
       final focusNode = FocusScopeNode();

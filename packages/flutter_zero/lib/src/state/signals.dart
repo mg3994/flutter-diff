@@ -57,3 +57,30 @@ class _SignalBuilderState<T> extends State<SignalBuilder<T>> {
     return widget.builder(context, widget.signal.value);
   }
 }
+
+extension SignalWatchExtension<T> on ReadonlySignal<T> {
+  T watch(BuildContext context) {
+    return value;
+  }
+}
+
+class Provided<T> extends InheritedWidget {
+  final T value;
+
+  const Provided({
+    super.key,
+    required this.value,
+    required super.child,
+  });
+
+  static T of<T>(BuildContext context) {
+    final provided = context.dependOnInheritedWidgetOfExactType<Provided<T>>();
+    if (provided == null) {
+      throw StateError('No Provided<$T> found in BuildContext.');
+    }
+    return provided.value;
+  }
+
+  @override
+  bool updateShouldNotify(Provided<T> oldWidget) => value != oldWidget.value;
+}

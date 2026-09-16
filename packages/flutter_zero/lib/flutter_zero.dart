@@ -133,3 +133,6 @@ export 'src/async/isolate.dart';
 export 'src/event/event_bus.dart';
 export 'src/state/state_machine.dart';
 export 'src/platform/dartnative_bridge.dart';
+export 'src/widgets/fast_list.dart';
+export 'src/platform/native_dialogs.dart';
+export 'src/platform/logging.dart';

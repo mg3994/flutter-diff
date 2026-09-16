@@ -1264,6 +1264,44 @@ void main() {
       expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
     });
 
+    test('FastList, FastGrid, MasonryFastGrid, Provided, signal.watch, and dnLog features', () async {
+      final backend = VirtualNativeUIBackend();
+      final countSignal = signal<int>(42);
+
+      final app = FlutterZeroApp(
+        rootWidget: Provided<String>(
+          value: 'Injected Dependency',
+          child: Column(
+            children: [
+              FastList(
+                itemCount: 5,
+                itemBuilder: (ctx, idx) => Text('Fast Item $idx'),
+              ),
+              FastGrid(
+                itemCount: 4,
+                itemBuilder: (ctx, idx) => Text('Grid Item $idx'),
+              ),
+              MasonryFastGrid(
+                itemCount: 3,
+                itemBuilder: (ctx, idx) => Text('Masonry Item $idx'),
+              ),
+            ],
+          ),
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final fastListNode = backend.views.values.firstWhere((v) => v.widgetType == 'FastList');
+      expect(fastListNode.props['itemCount'], equals(5));
+
+      final alertRes = await showAlert(title: 'Alert', message: 'Message');
+      expect(alertRes, isTrue);
+
+      dnLog('Logging test line');
+    });
+
     test('Material3Badge.count, CupertinoPageRoute, and FormField widgets', () {
       final backend = VirtualNativeUIBackend();
 

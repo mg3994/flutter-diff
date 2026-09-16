@@ -1250,6 +1250,34 @@ void main() {
       expect(controller.page, equals(1));
     });
 
+    test('Material3Badge.count, CupertinoPageRoute, and FormField widgets', () {
+      final backend = VirtualNativeUIBackend();
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const Material3Badge.count(
+              count: 5,
+              child: Text('Notification Bell'),
+            ),
+            FormField<String>(
+              initialValue: 'Initial Val',
+              builder: (field) => Text('Field Val: ${field.value}'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final badge = backend.views.values.firstWhere((v) => v.widgetType == 'Material3Badge');
+      expect(badge.props['count'], equals(5));
+
+      final route = CupertinoPageRoute<void>(builder: (ctx) => const Text('Cupertino Route'));
+      expect(route, isNotNull);
+    });
+
     test('Overlay, OverlayEntry, SliverLayoutBuilder, and SecondaryTabBar widgets', () {
       final backend = VirtualNativeUIBackend();
 

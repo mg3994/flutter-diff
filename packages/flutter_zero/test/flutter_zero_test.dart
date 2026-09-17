@@ -1264,6 +1264,39 @@ void main() {
       expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
     });
 
+    test('DirectionalBadge, CupertinoListTileNotched, and RestorableTextEditingControllerV3', () {
+      final backend = VirtualNativeUIBackend();
+      bool tapped = false;
+      final controller = RestorableTextEditingControllerV3(text: 'Text V3');
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const DirectionalBadge(
+              label: 'New',
+              child: Text('Directional Badge Target'),
+            ),
+            CupertinoListTileNotched(
+              title: const Text('Notched Title'),
+              onTap: () => tapped = true,
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final badge = backend.views.values.firstWhere((v) => v.widgetType == 'DirectionalBadge');
+      expect(badge.props['label'], equals('New'));
+
+      final notchedTile = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoListTileNotched');
+      backend.dispatchNativeEvent(notchedTile.handle, 'tap', {});
+      expect(tapped, isTrue);
+
+      expect(controller.text, equals('Text V3'));
+    });
+
     test('WidgetStateProperty, SliverMainAxisGroup, and CupertinoTabController', () {
       final property = WidgetStateProperty.all<String>('#FF0000');
       expect(property.resolve({WidgetState.hovered}), equals('#FF0000'));

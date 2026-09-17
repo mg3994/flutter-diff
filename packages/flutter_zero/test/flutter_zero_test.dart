@@ -1264,6 +1264,39 @@ void main() {
       expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
     });
 
+    test('AdaptiveCircularProgressIndicator, AdaptiveSlider, CupertinoSliverNavigationBar, and ExtendedFormState', () {
+      final backend = VirtualNativeUIBackend();
+      double sliderVal = 0.5;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            const AdaptiveCircularProgressIndicator(value: 0.75),
+            AdaptiveSlider(
+              value: sliderVal,
+              onChanged: (v) => sliderVal = v,
+            ),
+            const CupertinoSliverNavigationBar(
+              largeTitle: Text('Large Title'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final indicator = backend.views.values.firstWhere((v) => v.widgetType == 'AdaptiveCircularProgressIndicator');
+      expect(indicator.props['value'], equals(0.75));
+
+      final slider = backend.views.values.firstWhere((v) => v.widgetType == 'AdaptiveSlider');
+      backend.dispatchNativeEvent(slider.handle, 'change', {'value': 0.8});
+      expect(sliderVal, equals(0.8));
+
+      final formState = ExtendedFormState();
+      expect(formState.validate(), isTrue);
+    });
+
     test('BadgeCount, CupertinoListSectionInsetGrouped, and RestorableTextEditingController', () {
       final backend = VirtualNativeUIBackend();
       final controller = RestorableTextEditingController(value: 'Restored');

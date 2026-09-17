@@ -139,3 +139,6 @@ export 'src/platform/logging.dart';
 export 'src/widgets/material3_navigation_extended_v2.dart';
 export 'src/widgets/cupertino_advanced_menus_v2.dart';
 export 'src/widgets/form_fields_persistence_v2.dart';
+export 'src/widgets/material3_progress_and_sliders.dart';
+export 'src/widgets/cupertino_sheets_and_routes.dart';
+export 'src/widgets/form_fields_validation_state.dart';

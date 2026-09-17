@@ -142,3 +142,6 @@ export 'src/widgets/form_fields_persistence_v2.dart';
 export 'src/widgets/material3_progress_and_sliders.dart';
 export 'src/widgets/cupertino_sheets_and_routes.dart';
 export 'src/widgets/form_fields_validation_state.dart';
+export 'src/theme/widget_state.dart';
+export 'src/widgets/slivers_groups.dart';
+export 'src/navigation/cupertino_tab_controller.dart';

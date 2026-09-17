@@ -1264,6 +1264,34 @@ void main() {
       expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
     });
 
+    test('WidgetStateProperty, SliverMainAxisGroup, and CupertinoTabController', () {
+      final property = WidgetStateProperty.all<String>('#FF0000');
+      expect(property.resolve({WidgetState.hovered}), equals('#FF0000'));
+
+      final tabController = CupertinoTabController(initialIndex: 0);
+      int notifiedIndex = -1;
+      tabController.addListener(() {
+        notifiedIndex = tabController.index;
+      });
+      tabController.index = 1;
+      expect(notifiedIndex, equals(1));
+
+      final backend = VirtualNativeUIBackend();
+      final app = FlutterZeroApp(
+        rootWidget: const SliverMainAxisGroup(
+          slivers: [
+            SliverToBoxAdapter(child: Text('Group Child 1')),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final group = backend.views.values.firstWhere((v) => v.widgetType == 'SliverMainAxisGroup');
+      expect(group, isNotNull);
+    });
+
     test('AdaptiveCircularProgressIndicator, AdaptiveSlider, CupertinoSliverNavigationBar, and ExtendedFormState', () {
       final backend = VirtualNativeUIBackend();
       double sliderVal = 0.5;

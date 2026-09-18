@@ -1264,6 +1264,38 @@ void main() {
       expect(url, equals('https://cdn.dartnative.com/assets/image.png'));
     });
 
+    test('CupertinoSlider and FloatingActionButtonLarge widgets', () {
+      final backend = VirtualNativeUIBackend();
+      double sliderVal = 0.2;
+      bool fabClicked = false;
+
+      final app = FlutterZeroApp(
+        rootWidget: Column(
+          children: [
+            CupertinoSlider(
+              value: sliderVal,
+              onChanged: (v) => sliderVal = v,
+            ),
+            FloatingActionButtonLarge(
+              onPressed: () => fabClicked = true,
+              child: const Text('Large FAB'),
+            ),
+          ],
+        ),
+        backend: backend,
+      );
+
+      app.run();
+
+      final slider = backend.views.values.firstWhere((v) => v.widgetType == 'CupertinoSlider');
+      backend.dispatchNativeEvent(slider.handle, 'change', {'value': 0.6});
+      expect(sliderVal, equals(0.6));
+
+      final fabLarge = backend.views.values.firstWhere((v) => v.widgetType == 'FloatingActionButtonLarge');
+      backend.dispatchNativeEvent(fabLarge.handle, 'click', {});
+      expect(fabClicked, isTrue);
+    });
+
     test('DirectionalBadge, CupertinoListTileNotched, and RestorableTextEditingControllerV3', () {
       final backend = VirtualNativeUIBackend();
       bool tapped = false;

@@ -1,0 +1,25 @@
+name: flutter_zero
+description: A lightweight, modular Dart & Flutter application framework with a native platform UI rendering layer via Dart FFI interop.
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  bloc: ^9.2.1
+  crypto: ^3.0.7
+  dio: ^5.11.1
+  equatable: ^2.1.0
+  ffi: ^2.1.0
+  get_it: ^9.2.1
+  intl: ^0.20.3
+  logger: ^2.8.0
+  path: ^1.9.1
+  rxdart: ^0.28.0
+  signals_core: ^7.0.0
+  uuid: ^4.6.0
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0
